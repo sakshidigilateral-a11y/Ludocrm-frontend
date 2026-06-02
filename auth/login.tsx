@@ -18,8 +18,10 @@ import bgImg from "../assets/newAssets/Layer1copy.png";
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../App';
-import { API_BASE_URL, authHeaders } from '../api';
+import { authHeaders } from '../api';
 import { useAuth } from './AuthContext';
+import { mediatorLogin,  } from "../api/mediator";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
@@ -69,50 +71,95 @@ const LoginScreen = () => {
   const baseCardWidth = Math.min(width - 32, isTablet ? 500 : 430);
   const cardWidth = isLandscape && height < 500 ? Math.min(width - 32, 550) : baseCardWidth;
 
-  const handleLogin = async () => {
-    const trimmedUserId = userId.trim();
+const handleLogin = async () => {
+  const trimmedUserId = userId.trim();
 
-    if (!trimmedUserId || !password) {
-      showAlert('Login Required', 'Please enter your user ID and password.');
+  if (!trimmedUserId || !password) {
+    showAlert(
+      'Login Required',
+      'Please enter your user ID and password.',
+    );
+    return;
+  }
+
+  try {
+    setIsSubmitting(true);
+
+    // mediator api call
+    const json = await mediatorLogin(
+      trimmedUserId,
+      password,
+    );
+  console.log('Mediator login responseeeeeeeeeeeeee:', json);
+    // validation
+    if (!json.success) {
+      showAlert(
+        'Login Failed',
+        json.message || 'Invalid credentials.',
+      );
       return;
     }
 
-    try {
-      setIsSubmitting(true);
-      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: authHeaders(),
-        body: JSON.stringify({
-          userId: trimmedUserId,
-          password,
-        }),
-      });
+    const loginData = json.data;
+     console.log('Parsed login data:', loginData);
+    // optional access check
+    // if (loginData.user.hasAccess !== 1) {
+    //   showAlert(
+    //     'Access Denied',
+    //     'Your account does not have access.',
+    //   );
+    //   return;
+    // }
 
-      const json = await response.json();
+    // store session
+// save locally
+await AsyncStorage.multiSet([
+  ['token', loginData.token],
+  ['backendUrl', loginData.backendUrl],
+  ['businessUnit', loginData.businessUnit],
+  ['user', JSON.stringify(loginData.user)],
+]);
 
-      if (!response.ok) {
-        showAlert('Login Failed', json.message || 'Please check your credentials.');
-        return;
-      }
+console.log(
+  'BACKEND URL SAVED =>',
+  loginData.backendUrl,
+);
 
-      setSession({
-        token: json.token,
-        user: json.user,
-        currentBoard: json.currentBoard,
-      });
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'dashboard' }],
-      });
-    } catch (error) {
-      showAlert(
-        'Login Failed',
-        error instanceof Error ? error.message : 'Unable to connect to server.',
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+// store auth context
+setSession({
+  token: loginData.token,
+  user: loginData.user,
+  backendUrl: loginData.backendUrl,
+  businessUnit: loginData.businessUnit,
+  
+});
+
+await AsyncStorage.setItem(
+  'backendUrl',
+  loginData.backendUrl,
+);
+
+await AsyncStorage.setItem(
+  'token',
+  loginData.token,
+);
+// go dashboard
+navigation.reset({
+  index: 0,
+  routes: [{ name: 'dashboard' }],
+});
+
+  } catch (error) {
+    showAlert(
+      'Login Failed',
+      error instanceof Error
+        ? error.message
+        : 'Unable to connect to server.',
+    );
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   return (
     <LinearGradient

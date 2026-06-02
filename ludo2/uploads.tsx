@@ -19,7 +19,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { API_BASE_URL } from '../api';
+import { getBaseUrl } from '../api';
 import { useAuth } from '../auth/AuthContext';
 import ImageViewer from 'react-native-image-zoom-viewer';
 import AlertModal, { AlertButton } from '../components/AlertModal';
@@ -59,7 +59,7 @@ const TYPES = ['All Types', 'prescription', 'pob', 'camp'];
 const UploadsScreen = () => {
   const { user } = useAuth();
   const isFlm = user?.role?.toLowerCase() === 'flm';
-
+  const [baseUrl, setBaseUrl] = useState('');
   const [filter, setFilter] = useState('All Types');
   const [showDropdown, setShowDropdown] = useState(false);
   const [btnLayout, setBtnLayout] = useState<LayoutRectangle | null>(null);
@@ -83,8 +83,18 @@ const UploadsScreen = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [actionUpload, setActionUpload] = useState<UploadEntry | null>(null);
 
-  const managerId = user?.id || '';
+  const managerId = isFlm ? user?.flmId || '' : user?.mrId || '';
   const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    const loadBaseUrl = async () => {
+      const url = await getBaseUrl();
+
+      setBaseUrl(url);
+    };
+
+    loadBaseUrl();
+  }, []);
 
   useEffect(() => {
     fetchUploads();
@@ -94,9 +104,9 @@ const UploadsScreen = () => {
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState('');
   const [alertMessage, setAlertMessage] = useState('');
-  const [alertVariant, setAlertVariant] = useState<'info' | 'error' | 'confirm'>(
-    'info',
-  );
+  const [alertVariant, setAlertVariant] = useState<
+    'info' | 'error' | 'confirm'
+  >('info');
 
   const alertButtons: AlertButton[] = [
     {
@@ -113,10 +123,13 @@ const UploadsScreen = () => {
   ) => {
     setAlertTitle(title);
     setAlertMessage(message);
-    setAlertVariant(type === 'error' ? 'error' : type === 'warning' ? 'info' : 'confirm');
+    setAlertVariant(
+      type === 'error' ? 'error' : type === 'warning' ? 'info' : 'confirm',
+    );
     setAlertVisible(true);
   };
   const fetchUploads = useCallback(async () => {
+    const baseUrl = await getBaseUrl();
     abortRef.current?.abort();
     abortRef.current = new AbortController();
     const signal = abortRef.current.signal;
@@ -132,28 +145,84 @@ const UploadsScreen = () => {
 
       if (isFlm) {
         const res = await fetch(
-          `${API_BASE_URL}/api/flm/${managerId}/uploads/pending${qs}`,
+          `${baseUrl}/api/flm/${managerId}/uploads/pending${qs}`,
           { signal },
         );
         const json = await res.json();
         setData((json.data || []).map(mapUpload));
       } else {
-        const [pending, approved, rejected] = await Promise.all([
-          fetch(`${API_BASE_URL}/api/mr/${managerId}/uploads/pending${qs}`, {
-            signal,
-          }).then(r => r.json()),
-          fetch(`${API_BASE_URL}/api/mr/${managerId}/uploads/approved${qs}`, {
-            signal,
-          }).then(r => r.json()),
-          fetch(`${API_BASE_URL}/api/mr/${managerId}/uploads/rejected${qs}`, {
-            signal,
-          }).then(r => r.json()),
-        ]);
-        setData([
-          ...(pending.data || []).map(mapUpload),
-          ...(approved.data || []).map(mapUpload),
-          ...(rejected.data || []).map(mapUpload),
-        ]);
+        // const [pending, approved, rejected] = await Promise.all([
+        //   fetch(`${baseUrl}/api/mr/${managerId}/uploads/pending${qs}`, {
+        //     signal,
+        //   }).then(r => r.json()),
+        //   fetch(`${baseUrl}/api/mr/${managerId}/uploads/approved${qs}`, {
+        //     signal,
+        //   }).then(r => r.json()),
+        //   fetch(`${baseUrl}/api/mr/${managerId}/uploads/rejected${qs}`, {
+        //     signal,
+        //   }).then(r => r.json()),
+        // ]);
+
+        // const responses = await Promise.all([
+        //   fetch(`${baseUrl}/api/mr/${managerId}/uploads/pending${qs}`, {
+        //     signal,
+        //   }),
+
+        //   fetch(`${baseUrl}/api/mr/${managerId}/uploads/approved${qs}`, {
+        //     signal,
+        //   }),
+
+        //   fetch(`${baseUrl}/api/mr/${managerId}/uploads/rejected${qs}`, {
+        //     signal,
+        //   }),
+        // ]);
+
+        // const texts = await Promise.all(responses.map(r => r.text()));
+
+        // console.log('UPLOAD RESPONSES =>', texts);
+
+        // const [pending, approved, rejected] = texts.map(t => JSON.parse(t));
+        // setData([
+        //   ...(pending.data || []).map(mapUpload),
+        //   ...(approved.data || []).map(mapUpload),
+        //   ...(rejected.data || []).map(mapUpload),
+        // ]);
+        const urls = [
+          `${baseUrl}/api/mr/${managerId}/uploads/pending${qs}`,
+          `${baseUrl}/api/mr/${managerId}/uploads/approved${qs}`,
+          `${baseUrl}/api/mr/${managerId}/uploads/rejected${qs}`,
+        ];
+
+        const allUploads: any[] = [];
+
+        for (const url of urls) {
+          try {
+            console.log('FETCHING =>', url);
+
+            const response = await fetch(url, {
+              signal,
+            });
+
+            const text = await response.text();
+
+            console.log('RAW RESPONSE =>', text);
+
+            if (!text.startsWith('{')) {
+              console.log('INVALID JSON RESPONSE');
+              continue;
+            }
+
+            const json = JSON.parse(text);
+
+            if (json?.data?.length) {
+              allUploads.push(...json.data);
+            }
+          } catch (err) {
+            console.log('UPLOAD API FAILED =>', url, err);
+          }
+        }
+
+        setData(allUploads.map(mapUpload));
       }
     } catch (error: any) {
       if (error?.name !== 'AbortError')
@@ -193,20 +262,22 @@ const UploadsScreen = () => {
     mrZone: item.mrZone,
   });
 
-  const getImages = (uploadImage: any): string[] => {
+  const getImages = (uploadImage: any): Promise<string[]> => {
+    // const baseUrl = await getBaseUrl();
+
     try {
       const parsed =
         typeof uploadImage === 'string' ? JSON.parse(uploadImage) : uploadImage;
       const arr = Array.isArray(parsed) ? parsed : [parsed];
-      return arr.filter(Boolean).map((p: string) => `${API_BASE_URL}${p}`);
+      return arr.filter(Boolean).map((p: string) => `${baseUrl}${p}`);
     } catch {
-      return uploadImage ? [`${API_BASE_URL}${uploadImage}`] : [];
+      return uploadImage ? [`${baseUrl}${uploadImage}`] : [];
     }
   };
 
   const openDetail = (item: UploadEntry) => {
-  setExpandedId(prev => (prev === item.id ? null : item.id));
-};
+    setExpandedId(prev => (prev === item.id ? null : item.id));
+  };
 
   const openImageViewer = (images: string[], index: number) => {
     setImageViewerImages(images);
@@ -218,7 +289,7 @@ const UploadsScreen = () => {
     setActionLoading(true);
     try {
       const res = await fetch(
-        `${API_BASE_URL}/api/flm/${managerId}/uploads/${upload.id}/review`,
+        `${baseUrl}/api/flm/${managerId}/uploads/${upload.id}/review`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -248,7 +319,7 @@ const UploadsScreen = () => {
     setActionLoading(true);
     try {
       const res = await fetch(
-        `${API_BASE_URL}/api/flm/${managerId}/uploads/${actionUpload.id}/review`,
+        `${baseUrl}/api/flm/${managerId}/uploads/${actionUpload.id}/review`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -277,11 +348,11 @@ const UploadsScreen = () => {
     }
   };
 
-const changeDateBy = (days: number) => {
-  const newDate = selectedDate ? new Date(selectedDate) : new Date();
-  newDate.setDate(newDate.getDate() + days);
-  setSelectedDate(newDate);
-};
+  const changeDateBy = (days: number) => {
+    const newDate = selectedDate ? new Date(selectedDate) : new Date();
+    newDate.setDate(newDate.getDate() + days);
+    setSelectedDate(newDate);
+  };
 
   const onDateChange = (event: any, date?: Date) => {
     if (Platform.OS === 'android') setShowDatePicker(false);
@@ -294,13 +365,13 @@ const changeDateBy = (days: number) => {
   const openDatePicker = () => {
     if (Platform.OS === 'android') {
       DateTimePickerAndroid.open({
-  value: selectedDate || new Date(),
-  mode: 'date',
-  maximumDate: new Date(), // ADD THIS
-  onChange: (_event: any, date?: Date) => {
-    if (date) setSelectedDate(date);
-  },
-});
+        value: selectedDate || new Date(),
+        mode: 'date',
+        maximumDate: new Date(), // ADD THIS
+        onChange: (_event: any, date?: Date) => {
+          if (date) setSelectedDate(date);
+        },
+      });
     } else {
       setShowDatePicker(true);
     }
@@ -412,7 +483,7 @@ const changeDateBy = (days: number) => {
             {images.length > 0 && (
               <View>
                 <Text style={styles.imagesLabel}>Images ({images.length})</Text>
-                <ScrollView
+                {/* <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   style={styles.imagesRow}
@@ -429,12 +500,35 @@ const changeDateBy = (days: number) => {
                       />
                     </TouchableOpacity>
                   ))}
-                </ScrollView>
+
+                  {images.length > 0 && (
+                    <TouchableOpacity
+                      style={styles.viewBtn}
+                      onPress={() => openImageViewer(images, 0)}
+                    >
+                      <Icon name="visibility" size={s(18)} color="#FFF" />
+
+                      <Text style={styles.viewBtnText}>View Prescription</Text>
+                    </TouchableOpacity>
+                  )}
+                </ScrollView> */}
+                {images.length > 0 && (
+                  <TouchableOpacity
+                    style={styles.smallViewBtn}
+                    onPress={() => openImageViewer(images, 0)}
+                  >
+                    <Icon name="visibility" size={s(14)} color="#FFF" />
+
+                    <Text style={styles.smallViewBtnText}>
+                      View Prescription
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
             )}
 
             {/* Approve / Reject */}
-            {item.status === 'pending' && (
+            {isFlm && item.status === 'pending' && (
               <View style={styles.actionRow}>
                 <TouchableOpacity
                   style={styles.approveBtn}
@@ -464,8 +558,7 @@ const changeDateBy = (days: number) => {
       </View>
     );
   };
-const isToday =
-  selectedDate?.toDateString() === new Date().toDateString();
+  const isToday = selectedDate?.toDateString() === new Date().toDateString();
   return (
     <View style={styles.container}>
       <Image
@@ -560,12 +653,9 @@ const isToday =
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-  onPress={() => !isToday && changeDateBy(1)}
-  style={[
-    styles.dateBtn,
-    isToday && { opacity: 0.4 }
-  ]}
->
+                  onPress={() => !isToday && changeDateBy(1)}
+                  style={[styles.dateBtn, isToday && { opacity: 0.4 }]}
+                >
                   <Icon name="chevron-right" size={s(20)} color="#333" />
                 </TouchableOpacity>
               </View>
@@ -783,6 +873,23 @@ const styles = StyleSheet.create({
     paddingVertical: s(6),
     borderRadius: s(20),
   },
+  smallViewBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#5E35B1',
+    paddingHorizontal: s(10),
+    paddingVertical: s(6),
+    borderRadius: s(20),
+    marginTop: s(8),
+  },
+
+  smallViewBtnText: {
+    color: '#FFF',
+    fontSize: s(11),
+    fontWeight: '600',
+    marginLeft: s(4),
+  },
   filterText: { color: '#666', fontSize: s(12), fontWeight: '600' },
   dateBadge: {
     backgroundColor: '#FFF',
@@ -791,8 +898,18 @@ const styles = StyleSheet.create({
     borderRadius: s(20),
   },
   dateText: { color: '#333', fontWeight: 'bold', fontSize: s(11) },
-  tableBorder: { borderWidth: 2, borderColor: 'rgba(255,255,255,0.7)',borderRadius:20 ,overflow:'hidden'},
-  tableContainer: { paddingHorizontal: s(8), paddingVertical: s(8),borderTopRightRadius:20,borderTopLeftRadius:18 },
+  tableBorder: {
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.7)',
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  tableContainer: {
+    paddingHorizontal: s(8),
+    paddingVertical: s(8),
+    borderTopRightRadius: 20,
+    borderTopLeftRadius: 18,
+  },
   tableHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -994,13 +1111,13 @@ const styles = StyleSheet.create({
   // Expanded panel
   expandedPanel: {
     backgroundColor: 'rgba(255,255,255,0.08)',
-    marginHorizontal:s(10),
+    marginHorizontal: s(10),
     paddingHorizontal: s(12),
     paddingVertical: s(12),
     marginBottom: s(2),
     borderBottomWidth: 2,
     borderBottomColor: 'rgba(255,255,255,0.15)',
-    borderRadius:20
+    borderRadius: 20,
   },
   infoGrid: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: s(6) },
   infoItem: { width: '50%', paddingVertical: s(4) },

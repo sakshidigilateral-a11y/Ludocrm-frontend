@@ -14,7 +14,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { io, Socket } from 'socket.io-client';
-import { API_BASE_URL, authHeaders } from '../api';
+import { getBaseUrl, authHeaders } from '../api';
 import { useAuth } from '../auth/AuthContext';
 const { width: W, height: H } = Dimensions.get('window');
 const s = (size: number) => (W / 390) * size;
@@ -208,6 +208,12 @@ const fallbackByTab: Record<string, DashboardMatch[]> = {
 const ProfilePage = () => {
   const navigation = useNavigation<any>();
   const { session, user } = useAuth();
+  console.log('FULL USER =>', JSON.stringify(user, null, 2));
+
+  console.log('FULL SESSION =>', JSON.stringify(session, null, 2));
+
+  console.log('ROLE =>', user?.role);
+  const baseUrl = session?.backendUrl || '';
   const [activeTab, setActiveTab] = useState('Live');
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -226,13 +232,17 @@ const ProfilePage = () => {
   const [socketConnected, setSocketConnected] = useState(false);
   const inputRef = useRef<TextInput>(null);
   const socketRef = useRef<Socket | null>(null);
-  const playerId = user?.id || '';
   const playerRole = user?.role || 'MR';
+
+  const playerId =
+    user?.mrId || user?.flmId || user?.slmId || user?.tlmId || '';
+
   // For MR, use the manager/FLM id fetched into `profile.managerId` (e.g. E31671)
   // because `user?.flmId` can be empty in the AuthContext.
   // Creator/FLM id for boards/status filtering.
   // Must match `boards.creator` in MySQL.
-  const creatorId = 'A1234';
+  // const creatorId = 'A1234';
+  const creatorId = 'S1101';
 
   const profileTeamLogo = getTeamLogo(profile.teamName);
 
@@ -296,26 +306,39 @@ const ProfilePage = () => {
   };
 
   const loadProfile = useCallback(async () => {
+    console.log('FULL USER =>', JSON.stringify(user, null, 2));
+
+    console.log('ROLE =>', user?.role);
     if (!playerId) {
       return;
     }
 
     try {
-      const isFlm = playerRole === 'FLM';
-      const role = isFlm ? 'FLM' : 'MR';
+      const rolePath = playerRole.toLowerCase();
 
+      const baseUrl = await getBaseUrl();
+
+      const requestBody =
+        playerRole === 'MR'
+          ? { mrId: playerId }
+          : playerRole === 'FLM'
+          ? { flmId: playerId }
+          : playerRole === 'SLM'
+          ? { slmId: playerId }
+          : { tlmId: playerId };
+      console.log('PLAYER ID =>', playerId);
       const [detailsResponse, imageResponse] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/${isFlm ? 'flm' : 'mr'}/details`, {
+        fetch(`${baseUrl}/api/${rolePath}/details`, {
           method: 'POST',
           headers: authHeaders(session?.token),
-          body: JSON.stringify(
-            isFlm
-              ? { flmId: playerId }
-              : { mrId: playerId, flmId: user?.flmId, role: playerRole },
-          ),
+          body: JSON.stringify(requestBody),
         }),
-        fetch(`${API_BASE_URL}/profile/get?playerId=${playerId}&role=${role}`),
+
+        fetch(`${baseUrl}/api/profile/get?playerId=${playerId}&role=${playerRole}`),
       ]);
+
+      console.log('Profile details response:', detailsResponse);
+      console.log('Profile image response:', imageResponse);
 
       const json: MrDetailsResponse = await detailsResponse.json();
       const imageJson = await imageResponse.json();
@@ -327,9 +350,7 @@ const ProfilePage = () => {
       const data = json.data;
       const profileImageUrl =
         imageJson.success && imageJson.imageName
-          ? `${API_BASE_URL}/profileImage/${
-              imageJson.imageName
-            }?t=${Date.now()}`
+          ? `${baseUrl}/profileImage/${imageJson.imageName}?t=${Date.now()}`
           : null;
 
       setProfile({
@@ -380,7 +401,7 @@ const ProfilePage = () => {
           ? `?flmId=${encodeURIComponent(user.flmId)}`
           : '';
       const response = await fetch(
-        `${API_BASE_URL}/api/flm/getLast5GamesStats/${encodeURIComponent(
+        `${baseUrl}/api/flm/getLast5GamesStats/${encodeURIComponent(
           playerId,
         )}/${playerRole.toLowerCase()}${query}`,
         {
@@ -414,9 +435,9 @@ const ProfilePage = () => {
       if (!creatorId) {
         return;
       }
-
+      const baseUrl = await getBaseUrl();
       try {
-        const response = await fetch(`${API_BASE_URL}/api/flm/boards/status`, {
+        const response = await fetch(`${baseUrl}/api/flm/boards/status`, {
           method: 'POST',
           headers: authHeaders(session?.token),
           body: JSON.stringify({
@@ -463,44 +484,116 @@ const ProfilePage = () => {
     }, [loadBoards, loadProfile, loadRecentMatches]),
   );
 
+  // useEffect(() => {
+  //   const socket = io(baseUrl, {
+  //     transports: ['websocket'],
+  //     reconnection: true,
+  //     reconnectionAttempts: 10,
+  //   });
+
+  //   socketRef.current = socket;
+
+  //   socket.on('connect', () => {
+  //     setSocketConnected(true);
+  //   });
+
+  //   socket.on('disconnect', () => {
+  //     setSocketConnected(false);
+  //   });
+
+  //   socket.on('connect_error', error => {
+  //     setSocketConnected(false);
+  //     console.warn('Dashboard socket connection failed:', error.message);
+  //   });
+
+  //   socket.on('boardSummaryUpdated', refreshVisibleBoards);
+  //   socket.on('uploadCreated', refreshVisibleBoards);
+  //   socket.on('uploadStatusChanged', refreshVisibleBoards);
+  //   socket.on('activePlayerJoined', refreshVisibleBoards);
+  //   socket.on('activePlayerLeft', refreshVisibleBoards);
+
+  //   return () => {
+  //     socket.off('connect');
+  //     socket.off('disconnect');
+  //     socket.off('connect_error');
+  //     socket.off('boardSummaryUpdated');
+  //     socket.off('uploadCreated');
+  //     socket.off('uploadStatusChanged');
+  //     socket.off('activePlayerJoined');
+  //     socket.off('activePlayerLeft');
+  //     socket.disconnect();
+  //     socketRef.current = null;
+  //   };
+  // }, [refreshVisibleBoards]);
+
   useEffect(() => {
-    const socket = io(API_BASE_URL, {
-      transports: ['websocket'],
-      reconnection: true,
-      reconnectionAttempts: 10,
-    });
+    let socket: Socket;
 
-    socketRef.current = socket;
+    const initSocket = async () => {
+      const baseUrl = await getBaseUrl();
 
-    socket.on('connect', () => {
-      setSocketConnected(true);
-    });
+      if (!baseUrl) {
+        return;
+      }
 
-    socket.on('disconnect', () => {
-      setSocketConnected(false);
-    });
+      socket = io(baseUrl, {
+        transports: ['websocket'],
+        reconnection: true,
+        reconnectionAttempts: 10,
+      });
 
-    socket.on('connect_error', error => {
-      setSocketConnected(false);
-      console.warn('Dashboard socket connection failed:', error.message);
-    });
+      socketRef.current = socket;
 
-    socket.on('boardSummaryUpdated', refreshVisibleBoards);
-    socket.on('uploadCreated', refreshVisibleBoards);
-    socket.on('uploadStatusChanged', refreshVisibleBoards);
-    socket.on('activePlayerJoined', refreshVisibleBoards);
-    socket.on('activePlayerLeft', refreshVisibleBoards);
+      socket.on('connect', () => {
+        console.log('SOCKET CONNECTED');
+        setSocketConnected(true);
+      });
+
+      socket.on('disconnect', () => {
+        console.log('SOCKET DISCONNECTED');
+        setSocketConnected(false);
+      });
+
+      socket.on('connect_error', error => {
+        console.warn('Dashboard socket connection failed:', error.message);
+
+        setSocketConnected(false);
+      });
+
+      socket.on('boardSummaryUpdated', refreshVisibleBoards);
+
+      socket.on('uploadCreated', refreshVisibleBoards);
+
+      socket.on('uploadStatusChanged', refreshVisibleBoards);
+
+      socket.on('activePlayerJoined', refreshVisibleBoards);
+
+      socket.on('activePlayerLeft', refreshVisibleBoards);
+    };
+
+    initSocket();
 
     return () => {
-      socket.off('connect');
-      socket.off('disconnect');
-      socket.off('connect_error');
-      socket.off('boardSummaryUpdated');
-      socket.off('uploadCreated');
-      socket.off('uploadStatusChanged');
-      socket.off('activePlayerJoined');
-      socket.off('activePlayerLeft');
-      socket.disconnect();
+      if (socket) {
+        socket.off('connect');
+
+        socket.off('disconnect');
+
+        socket.off('connect_error');
+
+        socket.off('boardSummaryUpdated');
+
+        socket.off('uploadCreated');
+
+        socket.off('uploadStatusChanged');
+
+        socket.off('activePlayerJoined');
+
+        socket.off('activePlayerLeft');
+
+        socket.disconnect();
+      }
+
       socketRef.current = null;
     };
   }, [refreshVisibleBoards]);
@@ -593,7 +686,7 @@ const ProfilePage = () => {
             <View style={styles.statChip}>
               <Image
                 source={require('../assets/newAssets/bgdice.png')}
-                style={[styles.statIcon,{tintColor:'white'}]}
+                style={[styles.statIcon, { tintColor: 'white' }]}
               />
               <Text style={styles.statChipText}>{profile.diceRollBalance}</Text>
             </View>

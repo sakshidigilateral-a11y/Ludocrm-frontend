@@ -14,7 +14,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { io, Socket } from 'socket.io-client';
-import { API_BASE_URL, authHeaders } from '../api';
+import { getBaseUrl, authHeaders } from '../api';
 import { useAuth } from '../auth/AuthContext';
 
 const { width: W, height: H } = Dimensions.get('window');
@@ -203,6 +203,7 @@ const fallbackByTab: Record<string, DashboardMatch[]> = {
 const ProfilePage = () => {
   const navigation = useNavigation<any>();
   const { session, user } = useAuth();
+  const baseUrl = session?.backendUrl || '';
   const [activeTab, setActiveTab] = useState('Live');
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -218,12 +219,16 @@ const ProfilePage = () => {
   const [socketConnected, setSocketConnected] = useState(false);
   const inputRef = useRef<TextInput>(null);
   const socketRef = useRef<Socket | null>(null);
-  const playerId = user?.id || '';
   const playerRole = user?.role || 'MR';
+
+  const playerId =
+    user?.mrId || user?.flmId || user?.slmId || user?.tlmId || '';
+
   // For MR, use the manager/FLM id fetched into `profile.managerId` (e.g. E31671)
   // because `user?.flmId` can be empty in the AuthContext.
   // Force creatorId for board status filtering
   const creatorId = 'S1101';
+
   const profileTeamLogo = getTeamLogo(profile.teamName);
 
   const renderTeamLogo = (team?: string | null) => {
@@ -291,20 +296,33 @@ const ProfilePage = () => {
     }
 
     try {
-      const isFlm = playerRole === 'FLM';
-      const role = isFlm ? 'FLM' : 'MR';
+      const role = playerRole;
+
+      const rolePath = role.toLowerCase();
 
       const [detailsResponse, imageResponse] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/${isFlm ? 'flm' : 'mr'}/details`, {
+        fetch(`${baseUrl}/api/${rolePath}/details`, {
           method: 'POST',
           headers: authHeaders(session?.token),
           body: JSON.stringify(
-            isFlm
-              ? { flmId: playerId }
-              : { mrId: playerId, flmId: user?.flmId, role: playerRole },
+            role === 'MR'
+              ? {
+                  mrId: playerId,
+                }
+              : role === 'FLM'
+              ? {
+                  flmId: playerId,
+                }
+              : role === 'SLM'
+              ? {
+                  slmId: playerId,
+                }
+              : {
+                  tlmId: playerId,
+                },
           ),
         }),
-        fetch(`${API_BASE_URL}/profile/get?playerId=${playerId}&role=${role}`),
+        fetch(`${baseUrl}/api/profile/get?playerId=${playerId}&role=${role}`),
       ]);
 
       const json: MrDetailsResponse = await detailsResponse.json();
@@ -317,9 +335,7 @@ const ProfilePage = () => {
       const data = json.data;
       const profileImageUrl =
         imageJson.success && imageJson.imageName
-          ? `${API_BASE_URL}/profileImage/${
-              imageJson.imageName
-            }?t=${Date.now()}`
+          ? `${baseUrl}/profileImage/${imageJson.imageName}?t=${Date.now()}`
           : null;
 
       setProfile({
@@ -362,7 +378,7 @@ const ProfilePage = () => {
           ? `?flmId=${encodeURIComponent(user.flmId)}`
           : '';
       const response = await fetch(
-        `${API_BASE_URL}/api/flm/getLast5GamesStats/${encodeURIComponent(
+        `${baseUrl}/api/flm/getLast5GamesStats/${encodeURIComponent(
           playerId,
         )}/${playerRole.toLowerCase()}${query}`,
         {
@@ -398,7 +414,7 @@ const ProfilePage = () => {
       }
 
       try {
-        const response = await fetch(`${API_BASE_URL}/api/flm/boards/status`, {
+        const response = await fetch(`${baseUrl}/api/flm/boards/status`, {
           method: 'POST',
           headers: authHeaders(session?.token),
           body: JSON.stringify({
@@ -446,7 +462,7 @@ const ProfilePage = () => {
   );
 
   useEffect(() => {
-    const socket = io(API_BASE_URL, {
+    const socket = io(baseUrl, {
       transports: ['websocket'],
       reconnection: true,
       reconnectionAttempts: 10,
@@ -676,7 +692,11 @@ const ProfilePage = () => {
 
         <View style={styles.bottomSection}>
           <LinearGradient
-            colors={['rgb(109, 91, 183)', 'rgb(118, 98, 198)', 'rgb(128, 109, 203)']}
+            colors={[
+              'rgb(109, 91, 183)',
+              'rgb(118, 98, 198)',
+              'rgb(128, 109, 203)',
+            ]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.box}
@@ -724,7 +744,9 @@ const ProfilePage = () => {
                 <>
                   {activeTab === 'Live' &&
                     (matchesByTab.Live.length === 0 ? (
-                      <Text style={styles.emptyText}>No live Games At The Movement</Text>
+                      <Text style={styles.emptyText}>
+                        No live Games At The Movement
+                      </Text>
                     ) : (
                       matchesByTab.Live.map((match, index) => (
                         <View key={match._id} style={matchCardStyle(match)}>
@@ -793,7 +815,9 @@ const ProfilePage = () => {
                     ))}
                   {activeTab === 'Upcoming' &&
                     (matchesByTab.Upcoming.length === 0 ? (
-                      <Text style={styles.emptyText}>No Upcoming Games Scheduled</Text>
+                      <Text style={styles.emptyText}>
+                        No Upcoming Games Scheduled
+                      </Text>
                     ) : (
                       matchesByTab.Upcoming.map((match, index) => (
                         <View key={match._id} style={matchCardStyle(match)}>
@@ -1089,7 +1113,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: s(4),
   },
-  emptyText: { color: 'white', textAlign: 'center', marginTop: s(20) ,fontSize: 14},
+  emptyText: {
+    color: 'white',
+    textAlign: 'center',
+    marginTop: s(20),
+    fontSize: 14,
+  },
   box: {
     flex: 1,
     borderRadius: s(20),

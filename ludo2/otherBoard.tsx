@@ -24,7 +24,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { io, Socket } from 'socket.io-client';
-import { API_BASE_URL, authHeaders } from '../api';
+import { authHeaders } from '../api';
 import { useAuth } from '../auth/AuthContext';
 import DiceOne from '../assets/dice1.png';
 import DiceTwo from '../assets/dice2.png';
@@ -443,9 +443,13 @@ function gridToPixel(col: number, row: number) {
 // ─── MAIN COMPONENT ───
 export default function OtherBoardScreen(): ReactElement {
   const { session, user } = useAuth();
+  const baseUrl = session?.backendUrl;
   const isFlm = user?.role?.toLowerCase() === 'flm';
-  const myFlmId = isFlm ? user?.id : user?.flmId;
-
+  // const myPlayerId = isFlm ? user?.id : user?.flmId;
+const myPlayerId =
+  user?.role?.toUpperCase() === 'MR'
+    ? user?.mrId
+    : user?.flmId;
   // ─── STATE ───
   const [boardId, setBoardId] = useState<number | null>(null);
   const [otherBoards, setOtherBoards] = useState<OtherBoard[]>([]);
@@ -490,7 +494,7 @@ export default function OtherBoardScreen(): ReactElement {
   // ─── FETCH OTHER BOARDS ───
   const fetchOtherBoards = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/flm/boards/status`, {
+      const res = await fetch(`${baseUrl}/api/flm/boards/status`, {
         method: 'POST',
         headers: {
           ...authHeaders(session?.token),
@@ -499,7 +503,7 @@ export default function OtherBoardScreen(): ReactElement {
         body: JSON.stringify({
           creatorId: CREATOR_ID,
           status: 'active',
-          excludePlayerId: myFlmId,
+        excludePlayerId: myPlayerId,
         }),
       });
 
@@ -513,10 +517,13 @@ export default function OtherBoardScreen(): ReactElement {
         const boards = (json.data || []).filter(
           (board: any) =>
             !board.players?.some(
-              (p: any) => String(p.playerId) === String(myFlmId),
+              (p: any) =>String(p.playerId) === String(myPlayerId),
             ),
         );
-
+console.log('USER ROLE =>', user?.role);
+console.log('MY PLAYER ID =>', myPlayerId);
+console.log('ALL BOARDS =>', json.data);
+console.log('FILTERED BOARDS =>', boards);
         setOtherBoards(boards);
 
         if (boards.length > 0) {
@@ -533,7 +540,7 @@ export default function OtherBoardScreen(): ReactElement {
   const fetchBoardState = useCallback(
     async (bid: number) => {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/flm/boards/navigate`, {
+        const res = await fetch(`${baseUrl}/api/flm/boards/navigate`, {
           method: 'POST',
           headers: {
             ...authHeaders(session?.token),
@@ -543,7 +550,7 @@ export default function OtherBoardScreen(): ReactElement {
             creator: CREATOR_ID,
             direction: 'current',
             currentBoardId: bid,
-            excludePlayerId: myFlmId,
+            excludePlayerId: myPlayerId,
           }),
         });
 
@@ -567,7 +574,7 @@ export default function OtherBoardScreen(): ReactElement {
 
         setDiceRows(updatedDice);
         const myDiceRow = (data.diceValue || []).find(
-          (d: any) => d.playerId === myFlmId,
+          (d: any) => d.playerId === myPlayerId,
         );
 
         setMyDice(myDiceRow?.diceValue ?? null);
@@ -575,7 +582,7 @@ export default function OtherBoardScreen(): ReactElement {
         console.error('fetchBoardState error:', error);
       }
     },
-    [session?.token, myFlmId],
+    [session?.token, myPlayerId],
   );
   const sleep = (ms: number) =>
     new Promise<void>(resolve => setTimeout(() => resolve(), ms));
@@ -710,7 +717,7 @@ export default function OtherBoardScreen(): ReactElement {
   useEffect(() => {
     if (!displayBoardId) return;
 
-    const socket = io(API_BASE_URL, {
+    const socket = io(baseUrl, {
       transports: ['websocket'],
       reconnection: true,
     });
@@ -724,7 +731,7 @@ export default function OtherBoardScreen(): ReactElement {
         boardId: displayBoardId,
         isSpectator: true,
         userId: user?.id,
-        flmId: myFlmId,
+        flmId: myPlayerId,
       });
 
       console.log('SOCKET joinRoom emit =>', {
@@ -858,7 +865,7 @@ export default function OtherBoardScreen(): ReactElement {
 
         setDiceRows(updatedDice);
 
-        const myRow = updatedDice.find((r: any) => r.playerId === myFlmId);
+        const myRow = updatedDice.find((r: any) => r.playerId === myPlayerId);
 
         if (myRow !== undefined) {
           setMyDice(myRow?.diceValue ?? null);
@@ -879,7 +886,7 @@ export default function OtherBoardScreen(): ReactElement {
 
       socketRef.current = null;
     };
-  }, [displayBoardId, fetchBoardState, myFlmId]);
+  }, [displayBoardId, fetchBoardState, myPlayerId]);
 
   useEffect(() => {
     pawnsRef.current = pawns;

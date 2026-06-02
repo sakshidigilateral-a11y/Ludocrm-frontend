@@ -16,7 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useIsFocused } from '@react-navigation/native';
 
-import { API_BASE_URL, authHeaders } from '../api';
+import { authHeaders } from '../api';
 import { useAuth } from '../auth/AuthContext';
 
 import MyBoardScreen from './myBoard';
@@ -29,7 +29,7 @@ const RunScreen = () => {
     useState<'my' | 'others'>('my');
 
   const { session, user } = useAuth();
-
+const baseUrl = session?.backendUrl;
   const isFlm =
     user?.role?.toLowerCase() === 'flm';
 
@@ -63,7 +63,7 @@ const RunScreen = () => {
       return;
     }
 
-    await fetch(`${API_BASE_URL}/api/active-player/end`, {
+    await fetch(`${baseUrl}/api/active-player/end`, {
       method: 'POST',
       headers: {
         ...authHeaders(session?.token),
@@ -89,7 +89,7 @@ const RunScreen = () => {
 
     try {
       const res = await fetch(
-        `${API_BASE_URL}/api/active-player/board/${activeBoardId}`,
+        `${baseUrl}/api/active-player/board/${activeBoardId}`,
         {
           headers: authHeaders(session?.token),
         },

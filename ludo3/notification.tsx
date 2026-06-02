@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { io, Socket } from 'socket.io-client';
-import { API_BASE_URL, authHeaders } from '../api';
+import { getBaseUrl, authHeaders } from '../api';
 import { useAuth } from '../auth/AuthContext';
 
 const { width: W } = Dimensions.get('window');
@@ -101,6 +101,7 @@ const formatNotificationTime = (value: string) => {
 
 export default function Notification() {
   const { session, user } = useAuth();
+  const baseUrl = session?.backendUrl || '';
   const [selectedFilter, setSelectedFilter] = useState('Today');
   const [showFilters, setShowFilters] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -134,7 +135,7 @@ export default function Notification() {
         setErrorMessage('');
 
         const response = await fetch(
-          `${API_BASE_URL}/api/notifications?boardId=${encodeURIComponent(
+          `${baseUrl}/api/notifications?boardId=${encodeURIComponent(
             String(boardId),
           )}`,
           {
@@ -176,7 +177,7 @@ export default function Notification() {
     );
 
     try {
-      await fetch(`${API_BASE_URL}/api/notifications/${notification.id}/read`, {
+      await fetch(`${baseUrl}/api/notifications/${notification.id}/read`, {
         method: 'PATCH',
         headers: authHeaders(session?.token),
       });
@@ -194,7 +195,7 @@ export default function Notification() {
       return;
     }
 
-    const socket: Socket = io(API_BASE_URL, {
+    const socket: Socket = io(baseUrl, {
       transports: ['websocket'],
       reconnection: true,
       reconnectionAttempts: 10,

@@ -16,7 +16,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useAuth } from '../auth/AuthContext';
-import { API_BASE_URL, authHeaders } from '../api';
+import { authHeaders } from '../api';
 import AlertModal from '../components/AlertModal';
 
 const { width: W } = Dimensions.get('window');
@@ -66,7 +66,7 @@ interface GameStat {
 export default function Profile() {
   const navigation = useNavigation<any>();
   const { setSession, user, session } = useAuth();
-
+  const baseUrl = session?.backendUrl || '';
   const [activeTab, setActiveTab] = useState<'profile' | 'stats'>('profile');
   const [profileUri, setProfileUri] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -74,7 +74,7 @@ export default function Profile() {
   const [lastGames, setLastGames] = useState<GameStat[]>([]);
   const [statsLoading, setStatsLoading] = useState(false);
 
-  const role = user?.role?.toUpperCase() === 'FLM' ? 'FLM' : 'MR';
+  const role = user?.role?.toUpperCase() || 'MR';
 
   useEffect(() => {
     fetchProfileImage();
@@ -87,7 +87,9 @@ export default function Profile() {
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState<string>('');
   const [alertMessage, setAlertMessage] = useState<string>('');
-  const [alertVariant, setAlertVariant] = useState<'info' | 'error' | 'confirm'>('info');
+  const [alertVariant, setAlertVariant] = useState<
+    'info' | 'error' | 'confirm'
+  >('info');
   const closeAlert = () => setAlertVisible(false);
 
   const showAlert = (
@@ -104,14 +106,50 @@ export default function Profile() {
 
     setAlertVisible(true);
   };
+  // const fetchProfileImage = async () => {
+  //   try {
+  //     const res = await fetch(
+  //       `${baseUrl}/api/profile/get?playerId=${user?.id}&role=${role}`,
+  //     );
+  //     const json = await res.json();
+  //     if (json.success && json.imageName) {
+  //       setProfileUri(`${baseUrl}/profileImage/${json.imageName}`);
+  //     } else if (json.success && json.imageUrl) {
+  //       setProfileUri(json.imageUrl);
+  //     }
+  //   } catch (error) {
+  //     console.error('Error fetching profile image:', error);
+  //   }
+  // };
+
   const fetchProfileImage = async () => {
     try {
-      const res = await fetch(
-        `${API_BASE_URL}/profile/get?playerId=${user?.id}&role=${role}`,
-      );
-      const json = await res.json();
+      const playerId =
+        role === 'FLM'
+          ? user?.flmId
+          : role === 'SLM'
+          ? user?.slmId
+          : role === 'TLM'
+          ? user?.tlmId
+          : user?.mrId;
+
+      const imageUrl = `${baseUrl}/api/profile/get?playerId=${playerId}&role=${role}`;
+
+      console.log('IMAGE URL =>', imageUrl);
+
+      const res = await fetch(imageUrl);
+
+      console.log('STATUS =>', res.status);
+      console.log('CONTENT TYPE =>', res.headers.get('content-type'));
+
+      const text = await res.text();
+
+      console.log('IMAGE RESPONSE =>', text);
+
+      const json = JSON.parse(text);
+
       if (json.success && json.imageName) {
-        setProfileUri(`${API_BASE_URL}/profileImage/${json.imageName}`);
+        setProfileUri(`${baseUrl}/profileImage/${json.imageName}`);
       } else if (json.success && json.imageUrl) {
         setProfileUri(json.imageUrl);
       }
@@ -121,22 +159,36 @@ export default function Profile() {
   };
 
   const fetchStats = async () => {
-    if (!user?.id) return;
+    if (!user) return;
     setStatsLoading(true);
     try {
-      const flmId = role === 'FLM' ? user.id : user.flmId;
+      const flmId = user?.flmId;
       const query = role === 'MR' && flmId ? `?flmId=${flmId}` : '';
 
       const [statsRes, gamesRes] = await Promise.all([
         fetch(
-          `${API_BASE_URL}/api/flm/user/stats?userId=${user.id}&userRole=${role}`,
+          `${baseUrl}/api/flm/user/stats?userId=${
+            role === 'FLM'
+              ? user?.flmId
+              : role === 'SLM'
+              ? user?.slmId
+              : role === 'TLM'
+              ? user?.tlmId
+              : user?.mrId
+          }&userRole=${role}`,
           {
             headers: authHeaders(session?.token),
           },
         ),
         fetch(
-          `${API_BASE_URL}/api/flm/getLast5GamesStats/${
-            user.id
+          `${baseUrl}/api/flm/getLast5GamesStats/${
+            role === 'FLM'
+              ? user?.flmId
+              : role === 'SLM'
+              ? user?.slmId
+              : role === 'TLM'
+              ? user?.tlmId
+              : user?.mrId
           }/${role.toLowerCase()}${query}`,
           {
             headers: authHeaders(session?.token),
@@ -157,12 +209,12 @@ export default function Profile() {
     }
   };
 
-const handleLogout = () => {
-  setAlertTitle('Logout');
-  setAlertMessage('Do you want to logout?');
-  setAlertVariant('confirm');
-  setAlertVisible(true);
-};
+  const handleLogout = () => {
+    setAlertTitle('Logout');
+    setAlertMessage('Do you want to logout?');
+    setAlertVariant('confirm');
+    setAlertVisible(true);
+  };
 
   const pickProfileImage = async () => {
     try {
@@ -173,7 +225,7 @@ const handleLogout = () => {
         assetRepresentationMode: 'compatible',
       });
       if (result.didCancel) return;
-  if (result.errorCode) {
+      if (result.errorCode) {
         showAlert('Error', result.errorMessage || 'Unable to pick image.');
         return;
       }
@@ -190,20 +242,29 @@ const handleLogout = () => {
         type: asset.type || 'image/jpeg',
         name: asset.fileName || `profile_${Date.now()}.jpg`,
       } as any);
-      formData.append('playerId', user?.id || '');
+      formData.append(
+        'playerId',
+        role === 'FLM'
+          ? user?.flmId || ''
+          : role === 'SLM'
+          ? user?.slmId || ''
+          : role === 'TLM'
+          ? user?.tlmId || ''
+          : user?.mrId || '',
+      );
       formData.append('role', role);
 
-      const res = await fetch(`${API_BASE_URL}/profile/upload`, {
+      const res = await fetch(`${baseUrl}/api/profile/upload`, {
         method: 'POST',
         body: formData,
       });
       const json = await res.json();
       if (json.success) {
         const imageUrl = json.imageName
-          ? `${API_BASE_URL}/profileImage/${json.imageName}`
+          ? `${baseUrl}/profileImage/${json.imageName}`
           : json.imageUrl;
         setProfileUri(`${imageUrl}?t=${Date.now()}`);
-      showAlert('Success', 'Profile picture updated!');
+        showAlert('Success', 'Profile picture updated!');
       } else {
         showAlert('Error', json.message || 'Upload failed');
       }
@@ -351,9 +412,22 @@ const handleLogout = () => {
                   )}
                 </TouchableOpacity>
               </View>
-              <Text style={styles.profileName}>{user?.name || '-'}</Text>
+              <Text style={styles.profileName}>
+                {user?.mrName ||
+                  user?.flmName ||
+                  user?.slmName ||
+                  user?.tlmName ||
+                  '-'}
+              </Text>
               <View style={styles.idBadge}>
-                <Text style={styles.idText}>ID: {user?.id || '-'}</Text>
+                <Text style={styles.idText}>
+                  ID:{' '}
+                  {user?.mrId ||
+                    user?.flmId ||
+                    user?.slmId ||
+                    user?.tlmId ||
+                    '-'}
+                </Text>
               </View>
               <View style={styles.roleBadge}>
                 <Text style={styles.roleText}>{role}</Text>
@@ -630,68 +704,68 @@ const handleLogout = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#07113a' },
   alertOverlay: {
-  position: 'absolute',
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 0,
-  backgroundColor: 'rgba(0,0,0,0.65)',
-  justifyContent: 'center',
-  alignItems: 'center',
-  zIndex: 999,
-},
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 999,
+  },
 
-alertBox: {
-  width: '82%',
-  height: '20%',
-  borderRadius: 24,
-  paddingHorizontal: 25,
-  paddingVertical: 25,
-  alignItems: 'center',
-  borderWidth:2,
-  borderColor:'white'
-},
+  alertBox: {
+    width: '82%',
+    height: '20%',
+    borderRadius: 24,
+    paddingHorizontal: 25,
+    paddingVertical: 25,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'white',
+  },
 
-successAlert: {
-  backgroundColor: '#000f84',
-},
+  successAlert: {
+    backgroundColor: '#000f84',
+  },
 
-errorAlert: {
-  backgroundColor: '#000f84',
-},
+  errorAlert: {
+    backgroundColor: '#000f84',
+  },
 
-warningAlert: {
-  backgroundColor: '#1b339f',
-},
+  warningAlert: {
+    backgroundColor: '#1b339f',
+  },
 
-alertTitle: {
-  color: 'white',
-  fontSize: 22,
-  fontWeight: 'bold',
-  marginTop: 12,
-},
+  alertTitle: {
+    color: 'white',
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginTop: 12,
+  },
 
-alertMessage: {
-  color: 'white',
-  fontSize: 15,
-  textAlign: 'center',
-  marginTop: 10,
-  lineHeight: 22,
-},
+  alertMessage: {
+    color: 'white',
+    fontSize: 15,
+    textAlign: 'center',
+    marginTop: 10,
+    lineHeight: 22,
+  },
 
-alertButton: {
-  marginTop: 20,
-  backgroundColor: 'rgba(255,255,255,0.2)',
-  paddingHorizontal: 30,
-  paddingVertical: 10,
-  borderRadius: 15,
-},
+  alertButton: {
+    marginTop: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 30,
+    paddingVertical: 10,
+    borderRadius: 15,
+  },
 
-alertButtonText: {
-  color: 'white',
-  fontWeight: 'bold',
-  fontSize: 15,
-},
+  alertButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 15,
+  },
   safeArea: { flex: 1, paddingHorizontal: s(12), paddingTop: s(10) },
   topPanel: {
     backgroundColor: '#120082',

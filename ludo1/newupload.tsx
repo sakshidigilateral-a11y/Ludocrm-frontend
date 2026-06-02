@@ -15,7 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Asset, launchImageLibrary } from 'react-native-image-picker';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { API_BASE_URL, authHeaders } from '../api';
+import { getBaseUrl, authHeaders } from '../api';
 import { useAuth } from '../auth/AuthContext';
 import AlertModal from '../components/AlertModal';
 
@@ -78,7 +78,7 @@ const fileNameFromAsset = (asset: Asset, index: number) =>
 
 export default function UploadPrescriptionScreen() {
   const { session, user } = useAuth();
-
+const baseUrl = session?.backendUrl || '';
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [camps, setCamps] = useState<Camp[]>([]);
@@ -183,13 +183,13 @@ export default function UploadPrescriptionScreen() {
       setIsLoading(true);
       const [activityResponse, brandResponse, campResponse] = await Promise.all(
         [
-          fetch(`${API_BASE_URL}/api/mr/activity-types?isActive=true`, {
+          fetch(`${baseUrl}/api/mr/activity-types?isActive=true`, {
             headers: authHeaders(session?.token),
           }),
-          fetch(`${API_BASE_URL}/api/mr/brands?limit=1000`, {
+          fetch(`${baseUrl}/api/mr/brands?limit=1000`, {
             headers: authHeaders(session?.token),
           }),
-          fetch(`${API_BASE_URL}/api/mr/camps?limit=1000`, {
+          fetch(`${baseUrl}/api/mr/camps?limit=1000`, {
             headers: authHeaders(session?.token),
           }),
         ],
@@ -375,7 +375,7 @@ export default function UploadPrescriptionScreen() {
     try {
       setIsSubmitting(true);
       const response = await fetch(
-        `${API_BASE_URL}/api/mr/upload/${user?.id}`,
+        `${baseUrl}/api/mr/upload/${user?.id}`,
         {
           method: 'POST',
           headers: {

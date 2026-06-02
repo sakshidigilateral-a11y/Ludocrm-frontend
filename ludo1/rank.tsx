@@ -12,8 +12,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import { io, Socket } from 'socket.io-client';
-import { API_BASE_URL, authHeaders } from '../api';
+import { getBaseUrl, authHeaders } from '../api';
 import { useAuth } from '../auth/AuthContext';
+import { baseUrl } from './../api';
 
 const { width: W } = Dimensions.get('window');
 const s = (size: number) => (W / 390) * size;
@@ -300,6 +301,7 @@ const getWeeksForMonth = (month: string | null) => {
 };
 const LeaderboardScreen: React.FC = () => {
   const { session, user } = useAuth();
+  const baseUrl = session?.backendUrl || '';
   const [activeTab, setActiveTab] = useState<RankTab>('Team Rank');
   const [activeMonth, setActiveMonth] = useState<string | null>(null);
   const [selectedWeek, setSelectedWeek] = useState<{
@@ -370,13 +372,146 @@ const LeaderboardScreen: React.FC = () => {
   const weeks = useMemo(() => getWeeksForMonth(activeMonth), [activeMonth]);
   const sortBy = activeFilter;
 
-  const leaderboardUrl = useMemo(() => {
+//   const leaderboardUrl = useMemo(() => {
+//     let endpoint = '/api/flm/leaderboard/home';
+
+//     if (activeTab === 'Team Rank') {
+//       if (activeFilter === 'home') {
+//         endpoint = '/api/flm/leaderboard/home';
+//       }
+
+//       if (activeFilter === 'moves') {
+//         endpoint = '/api/flm/leaderboard/moves';
+//       }
+
+//       if (activeFilter === 'kills') {
+//         endpoint = '/api/flm/leaderboard/kills';
+//       }
+
+//       if (activeFilter === 'moveup') {
+//         endpoint = '/api/flm/leaderboard/moves-earned';
+//       }
+
+//       if (activeFilter === 'movedown') {
+//         endpoint = '/api/flm/leaderboard/moves-lost';
+//       }
+//       if (activeFilter === 'dice') {
+//   endpoint =
+//     '/api/flm/leaderboard/dice-roll-balance?division=team&limit=all&managerLevel=flm';
+// }
+      
+//     }
+
+//  if (activeTab === 'Player Rank') {
+//   endpoint = '/api/flm/leaderboard/mr-points';
+
+//   if (activeFilter === 'dice') {
+//     endpoint = '/api/flm/leaderboard/dice-roll-balance';
+//   }
+// }
+//   const params = new URLSearchParams({
+//       limit: '10',
+//       userId: user?.id || '',
+//       userRole: (user?.role || '').toLowerCase(),
+//       sortBy,
+//     });
+//     const range = selectedWeek || monthRangeForCurrentYear(activeMonth);
+
+//     if (range) {
+//       params.set('startDate', range.startDate);
+//       params.set('endDate', range.endDate);
+//     }
+
+//     if (
+//   activeTab === 'Team Rank' &&
+//   activeFilter === 'dice'
+// ) {
+//   return `${baseUrl}${endpoint}&${params.toString()}`;
+// }
+
+// return `${baseUrl}${endpoint}?${params.toString()}`;
+//     }, [
+//   activeMonth,
+//   selectedWeek,
+//   activeTab,
+//   sortBy,
+//   user?.id,
+//   user?.role,
+// ]);
+
+  // const loadLeaderboard = useCallback(async () => {
+  //   if (!user?.id) {
+  //     setData([]);
+  //     setMyRank(null);
+  //     return;
+  //   }
+
+  //   try {
+  //     setIsLoading(true);
+  //     setErrorMessage('');
+
+  //     const response = await fetch(leaderboardUrl, {
+  //       headers: authHeaders(session?.token),
+  //     });
+
+  //     const text = await response.text();
+
+  //     // console.log('RAW RESPONSE =>', text);
+
+  //     let json: LeaderboardApiResponse;
+
+  //     try {
+  //       json = JSON.parse(text);
+  //     } catch (e) {
+  //       throw new Error(`Invalid JSON response: ${text.slice(0, 100)}`);
+  //     }
+
+  //     if (!response.ok || !json.success) {
+  //       setData([]);
+  //       setMyRank(null);
+  //       setErrorMessage(json.message || 'Unable to load leaderboard.');
+  //       return;
+  //     }
+  //     console.log('FIRST ROW =>', JSON.stringify(json.data?.[0], null, 2));
+
+  //     const mappedData = (json.data || []).map((item, index) =>
+  //       mapLeaderboardRow(item, index, activeTab),
+  //     );
+  //     const mappedHighlight = json.highlight
+  //       ? mapLeaderboardRow(json.highlight, 0, activeTab)
+  //       : mappedData.find(item => item.isHighlighted) || null;
+
+  //     setData(mappedData);
+  //     setMyRank(mappedHighlight);
+  //   } catch (error) {
+  //     setData([]);
+  //     setMyRank(null);
+  //     setErrorMessage(
+  //       error instanceof Error ? error.message : 'Unable to load leaderboard.',
+  //     );
+  //   } finally {
+  //     setIsLoading(false);
+  //   }
+  // }, [activeTab, leaderboardUrl, session?.token, user?.id]);
+
+  const loadLeaderboard = useCallback(async () => {
+
+  if (!user?.id) {
+    setData([]);
+    setMyRank(null);
+    return;
+  }
+
+  try {
+
+    setIsLoading(true);
+    setErrorMessage('');
+
+    const baseUrl = await getBaseUrl();
+
     let endpoint = '/api/flm/leaderboard/home';
 
     if (activeTab === 'Team Rank') {
-      if (activeFilter === 'home') {
-        endpoint = '/api/flm/leaderboard/home';
-      }
 
       if (activeFilter === 'moves') {
         endpoint = '/api/flm/leaderboard/moves';
@@ -387,117 +522,152 @@ const LeaderboardScreen: React.FC = () => {
       }
 
       if (activeFilter === 'moveup') {
-        endpoint = '/api/flm/leaderboard/moves-earned';
+        endpoint =
+          '/api/flm/leaderboard/moves-earned';
       }
 
       if (activeFilter === 'movedown') {
-        endpoint = '/api/flm/leaderboard/moves-lost';
+        endpoint =
+          '/api/flm/leaderboard/moves-lost';
       }
+
       if (activeFilter === 'dice') {
-  endpoint =
-    '/api/flm/leaderboard/dice-roll-balance?division=team&limit=all&managerLevel=flm';
-}
-      
+        endpoint =
+          '/api/flm/leaderboard/dice-roll-balance?division=team&limit=all&managerLevel=flm';
+      }
     }
 
- if (activeTab === 'Player Rank') {
-  endpoint = '/api/flm/leaderboard/mr-points';
+    if (activeTab === 'Player Rank') {
 
-  if (activeFilter === 'dice') {
-    endpoint = '/api/flm/leaderboard/dice-roll-balance';
-  }
-}
-  const params = new URLSearchParams({
+      endpoint = '/api/flm/leaderboard/mr-points';
+
+      if (activeFilter === 'dice') {
+        endpoint =
+          '/api/flm/leaderboard/dice-roll-balance';
+      }
+    }
+
+    const params = new URLSearchParams({
       limit: '10',
       userId: user?.id || '',
       userRole: (user?.role || '').toLowerCase(),
-      sortBy,
+      sortBy: activeFilter,
     });
-    const range = selectedWeek || monthRangeForCurrentYear(activeMonth);
+
+    const range =
+      selectedWeek ||
+      monthRangeForCurrentYear(activeMonth);
 
     if (range) {
       params.set('startDate', range.startDate);
       params.set('endDate', range.endDate);
     }
 
-    if (
-  activeTab === 'Team Rank' &&
-  activeFilter === 'dice'
-) {
-  return `${API_BASE_URL}${endpoint}&${params.toString()}`;
-}
+    const leaderboardUrl =
+      activeTab === 'Team Rank' &&
+      activeFilter === 'dice'
+        ? `${baseUrl}${endpoint}&${params.toString()}`
+        : `${baseUrl}${endpoint}?${params.toString()}`;
 
-return `${API_BASE_URL}${endpoint}?${params.toString()}`;
-    }, [
-  activeMonth,
-  selectedWeek,
-  activeTab,
-  sortBy,
-  user?.id,
-  user?.role,
-]);
+    console.log(
+      'LEADERBOARD URL =>',
+      leaderboardUrl,
+    );
 
-  const loadLeaderboard = useCallback(async () => {
-    if (!user?.id) {
+    const response = await fetch(
+      leaderboardUrl,
+      {
+        headers: authHeaders(session?.token),
+      },
+    );
+
+    const text = await response.text();
+
+    console.log(
+      'LEADERBOARD RAW =>',
+      text,
+    );
+
+    let json: LeaderboardApiResponse;
+
+    try {
+      json = JSON.parse(text);
+    } catch (e) {
+      throw new Error(
+        `Invalid JSON response: ${text.slice(
+          0,
+          100,
+        )}`,
+      );
+    }
+
+    if (!response.ok || !json.success) {
+
       setData([]);
       setMyRank(null);
+
+      setErrorMessage(
+        json.message ||
+          'Unable to load leaderboard.',
+      );
+
       return;
     }
 
-    try {
-      setIsLoading(true);
-      setErrorMessage('');
+    const mappedData = (
+      json.data || []
+    ).map((item, index) =>
+      mapLeaderboardRow(
+        item,
+        index,
+        activeTab,
+      ),
+    );
 
-      const response = await fetch(leaderboardUrl, {
-        headers: authHeaders(session?.token),
-      });
+    const mappedHighlight = json.highlight
+      ? mapLeaderboardRow(
+          json.highlight,
+          0,
+          activeTab,
+        )
+      : mappedData.find(
+          item => item.isHighlighted,
+        ) || null;
 
-      const text = await response.text();
+    setData(mappedData);
+    setMyRank(mappedHighlight);
 
-      // console.log('RAW RESPONSE =>', text);
+  } catch (error) {
 
-      let json: LeaderboardApiResponse;
+    setData([]);
+    setMyRank(null);
 
-      try {
-        json = JSON.parse(text);
-      } catch (e) {
-        throw new Error(`Invalid JSON response: ${text.slice(0, 100)}`);
-      }
+    setErrorMessage(
+      error instanceof Error
+        ? error.message
+        : 'Unable to load leaderboard.',
+    );
 
-      if (!response.ok || !json.success) {
-        setData([]);
-        setMyRank(null);
-        setErrorMessage(json.message || 'Unable to load leaderboard.');
-        return;
-      }
-      console.log('FIRST ROW =>', JSON.stringify(json.data?.[0], null, 2));
+  } finally {
+    setIsLoading(false);
+  }
 
-      const mappedData = (json.data || []).map((item, index) =>
-        mapLeaderboardRow(item, index, activeTab),
-      );
-      const mappedHighlight = json.highlight
-        ? mapLeaderboardRow(json.highlight, 0, activeTab)
-        : mappedData.find(item => item.isHighlighted) || null;
-
-      setData(mappedData);
-      setMyRank(mappedHighlight);
-    } catch (error) {
-      setData([]);
-      setMyRank(null);
-      setErrorMessage(
-        error instanceof Error ? error.message : 'Unable to load leaderboard.',
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  }, [activeTab, leaderboardUrl, session?.token, user?.id]);
+}, [
+  activeMonth,
+  selectedWeek,
+  activeTab,
+  activeFilter,
+  session?.token,
+  user?.id,
+  user?.role,
+]);
 
   useEffect(() => {
     loadLeaderboard();
   }, [loadLeaderboard]);
 
   useEffect(() => {
-    const socket: Socket = io(API_BASE_URL, {
+    const socket: Socket = io(baseUrl, {
       transports: ['websocket'],
       reconnection: true,
       reconnectionAttempts: 10,

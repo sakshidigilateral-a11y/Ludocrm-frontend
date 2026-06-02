@@ -16,7 +16,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useAuth } from '../auth/AuthContext';
-import { API_BASE_URL, authHeaders } from '../api';
+import { authHeaders } from '../api';
 import AlertModal from '../components/AlertModal';
 
 const { width: W } = Dimensions.get('window');
@@ -107,11 +107,11 @@ export default function Profile() {
   const fetchProfileImage = async () => {
     try {
       const res = await fetch(
-        `${API_BASE_URL}/profile/get?playerId=${user?.id}&role=${role}`,
+        `${baseUrl}/api/profile/get?playerId=${user?.id}&role=${role}`,
       );
       const json = await res.json();
       if (json.success && json.imageName) {
-        setProfileUri(`${API_BASE_URL}/profileImage/${json.imageName}`);
+        setProfileUri(`${baseUrl}/profileImage/${json.imageName}`);
       } else if (json.success && json.imageUrl) {
         setProfileUri(json.imageUrl);
       }
@@ -129,13 +129,13 @@ export default function Profile() {
 
       const [statsRes, gamesRes] = await Promise.all([
         fetch(
-          `${API_BASE_URL}/api/flm/user/stats?userId=${user.id}&userRole=${role}`,
+          `${baseUrl}/api/flm/user/stats?userId=${user.id}&userRole=${role}`,
           {
             headers: authHeaders(session?.token),
           },
         ),
         fetch(
-          `${API_BASE_URL}/api/flm/getLast5GamesStats/${
+          `${baseUrl}/api/flm/getLast5GamesStats/${
             user.id
           }/${role.toLowerCase()}${query}`,
           {
@@ -193,14 +193,14 @@ const handleLogout = () => {
       formData.append('playerId', user?.id || '');
       formData.append('role', role);
 
-      const res = await fetch(`${API_BASE_URL}/profile/upload`, {
+      const res = await fetch(`${baseUrl}/api/profile/upload`, {
         method: 'POST',
         body: formData,
       });
       const json = await res.json();
       if (json.success) {
         const imageUrl = json.imageName
-          ? `${API_BASE_URL}/profileImage/${json.imageName}`
+          ? `${baseUrl}/profileImage/${json.imageName}`
           : json.imageUrl;
         setProfileUri(`${imageUrl}?t=${Date.now()}`);
       showAlert('Success', 'Profile picture updated!');

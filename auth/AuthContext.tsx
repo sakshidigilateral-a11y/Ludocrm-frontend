@@ -10,16 +10,24 @@ import React, {
 
 export type AuthUser = {
   id: string;
+
+  mrId?: string | null;
+  flmId?: string | null;
+
   name?: string | null;
   role: string;
+
   adminId?: string | null;
   teamName?: string | null;
-  flmId?: string | null;
 };
 
 type AuthSession = {
   token: string;
   user: AuthUser;
+
+  backendUrl?: string;
+  businessUnit?: string;
+
   currentBoard?: {
     boardId: number | string;
     myColor?: string | null;

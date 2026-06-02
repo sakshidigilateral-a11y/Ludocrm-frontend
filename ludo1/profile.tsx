@@ -16,7 +16,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useAuth } from '../auth/AuthContext';
-import { API_BASE_URL, authHeaders } from '../api';
+import { authHeaders } from '../api';
 import AlertModal from '../components/AlertModal';
 
 const { width: W } = Dimensions.get('window');
@@ -66,7 +66,7 @@ interface GameStat {
 export default function Profile() {
   const navigation = useNavigation<any>();
   const { setSession, user, session } = useAuth();
-
+   const baseUrl = session?.backendUrl || '';
   const [activeTab, setActiveTab] = useState<'profile' | 'stats'>('profile');
   const [profileUri, setProfileUri] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -104,14 +104,27 @@ export default function Profile() {
 
     setAlertVisible(true);
   };
+  console.log(
+  'IMAGE URL =>',
+  `${baseUrl}/api/profile/get?playerId=${
+    role === 'FLM'
+      ? user?.flmId
+      : user?.id
+  }&role=${role}`,
+);
   const fetchProfileImage = async () => {
     try {
       const res = await fetch(
-        `${API_BASE_URL}/profile/get?playerId=${user?.id}&role=${role}`,
+      `${baseUrl}/api/api/profile/get?playerId=${
+  role === 'FLM'
+    ? user?.flmId
+    : user?.id
+}&role=${role}`
+
       );
       const json = await res.json();
       if (json.success && json.imageName) {
-        setProfileUri(`${API_BASE_URL}/profileImage/${json.imageName}`);
+        setProfileUri(`${baseUrl}/profileImage/${json.imageName}`);
       } else if (json.success && json.imageUrl) {
         setProfileUri(json.imageUrl);
       }
@@ -124,18 +137,25 @@ export default function Profile() {
     if (!user?.id) return;
     setStatsLoading(true);
     try {
-      const flmId = role === 'FLM' ? user.id : user.flmId;
+    const flmId =
+  role === 'FLM'
+    ? user.flmId
+    : user.flmId;
       const query = role === 'MR' && flmId ? `?flmId=${flmId}` : '';
 
       const [statsRes, gamesRes] = await Promise.all([
         fetch(
-          `${API_BASE_URL}/api/flm/user/stats?userId=${user.id}&userRole=${role}`,
+          `${baseUrl}/api/flm/user/stats?userId=${
+  role === 'FLM'
+    ? user.flmId
+    : user.id
+}&userRole=${role}`,
           {
             headers: authHeaders(session?.token),
           },
         ),
         fetch(
-          `${API_BASE_URL}/api/flm/getLast5GamesStats/${
+          `${baseUrl}/api/flm/getLast5GamesStats/${
             user.id
           }/${role.toLowerCase()}${query}`,
           {
@@ -190,17 +210,30 @@ const handleLogout = () => {
         type: asset.type || 'image/jpeg',
         name: asset.fileName || `profile_${Date.now()}.jpg`,
       } as any);
-      formData.append('playerId', user?.id || '');
+     formData.append(
+  'playerId',
+  role === 'FLM'
+    ? user?.flmId || ''
+    : user?.id || '',
+);
+console.log(
+  'IMAGE URL =>',
+  `${baseUrl}/api/profile/get?playerId=${
+    role === 'FLM'
+      ? user?.flmId
+      : user?.id
+  }&role=${role}`,
+);
       formData.append('role', role);
 
-      const res = await fetch(`${API_BASE_URL}/profile/upload`, {
+      const res = await fetch(`${baseUrl}/api/api/profile/upload`, {
         method: 'POST',
         body: formData,
       });
       const json = await res.json();
       if (json.success) {
         const imageUrl = json.imageName
-          ? `${API_BASE_URL}/profileImage/${json.imageName}`
+          ? `${baseUrl}/profileImage/${json.imageName}`
           : json.imageUrl;
         setProfileUri(`${imageUrl}?t=${Date.now()}`);
       showAlert('Success', 'Profile picture updated!');

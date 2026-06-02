@@ -19,7 +19,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { API_BASE_URL } from '../api';
+import { getBaseUrl} from '../api';
 import { useAuth } from '../auth/AuthContext';
 import ImageViewer from 'react-native-image-zoom-viewer';
 import AlertModal, { AlertButton } from '../components/AlertModal';
@@ -132,20 +132,20 @@ const UploadsScreen = () => {
 
       if (isFlm) {
         const res = await fetch(
-          `${API_BASE_URL}/api/flm/${managerId}/uploads/pending${qs}`,
+          `${baseUrl}/api/flm/${managerId}/uploads/pending${qs}`,
           { signal },
         );
         const json = await res.json();
         setData((json.data || []).map(mapUpload));
       } else {
         const [pending, approved, rejected] = await Promise.all([
-          fetch(`${API_BASE_URL}/api/mr/${managerId}/uploads/pending${qs}`, {
+          fetch(`${baseUrl}/api/mr/${managerId}/uploads/pending${qs}`, {
             signal,
           }).then(r => r.json()),
-          fetch(`${API_BASE_URL}/api/mr/${managerId}/uploads/approved${qs}`, {
+          fetch(`${baseUrl}/api/mr/${managerId}/uploads/approved${qs}`, {
             signal,
           }).then(r => r.json()),
-          fetch(`${API_BASE_URL}/api/mr/${managerId}/uploads/rejected${qs}`, {
+          fetch(`${baseUrl}/api/mr/${managerId}/uploads/rejected${qs}`, {
             signal,
           }).then(r => r.json()),
         ]);
@@ -198,9 +198,9 @@ const UploadsScreen = () => {
       const parsed =
         typeof uploadImage === 'string' ? JSON.parse(uploadImage) : uploadImage;
       const arr = Array.isArray(parsed) ? parsed : [parsed];
-      return arr.filter(Boolean).map((p: string) => `${API_BASE_URL}${p}`);
+      return arr.filter(Boolean).map((p: string) => `${baseUrl}${p}`);
     } catch {
-      return uploadImage ? [`${API_BASE_URL}${uploadImage}`] : [];
+      return uploadImage ? [`${baseUrl}${uploadImage}`] : [];
     }
   };
 
@@ -218,7 +218,7 @@ const UploadsScreen = () => {
     setActionLoading(true);
     try {
       const res = await fetch(
-        `${API_BASE_URL}/api/flm/${managerId}/uploads/${upload.id}/review`,
+        `${baseUrl}/api/flm/${managerId}/uploads/${upload.id}/review`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -248,7 +248,7 @@ const UploadsScreen = () => {
     setActionLoading(true);
     try {
       const res = await fetch(
-        `${API_BASE_URL}/api/flm/${managerId}/uploads/${actionUpload.id}/review`,
+        `${baseUrl}/api/flm/${managerId}/uploads/${actionUpload.id}/review`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

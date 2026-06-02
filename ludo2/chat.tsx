@@ -19,8 +19,8 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 
 import { io, Socket } from 'socket.io-client';
 
-import { API_BASE_URL } from '../api';
-
+import { getBaseUrl} from '../api';
+const baseUrl = getBaseUrl();
 const { width: W, height: H } =
   Dimensions.get('window');
 
@@ -79,7 +79,7 @@ export default function Chat({
 
     console.log('[CHAT] Initializing socket for boardId:', boardId);
 
-    const socket = io(API_BASE_URL, {
+    const socket = io(baseUrl, {
       transports: ['websocket'],
       reconnection: true,
       forceNew: false, // Changed from true to false to prevent duplicate connections

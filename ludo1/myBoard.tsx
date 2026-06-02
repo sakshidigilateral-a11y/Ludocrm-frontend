@@ -6,9 +6,7 @@ import React, {
   JSX,
   useMemo,
 } from 'react';
-import {
-  Modal,
-} from 'react-native';
+import { Modal } from 'react-native';
 import AnimatedPawn from '../components/AnimatedPawn';
 import {
   Text,
@@ -22,7 +20,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { io, Socket } from 'socket.io-client';
-import { API_BASE_URL, authHeaders } from '../api';
+import { getBaseUrl, authHeaders } from '../api';
 import { useAuth } from '../auth/AuthContext';
 import DiceOne from '../assets/dice1.png';
 import DiceTwo from '../assets/dice2.png';
@@ -411,14 +409,8 @@ function gridToPixel(col: number, row: number) {
   };
 }
 
-const getDicePosition = (
-  color?: string | null,
-) => {
-
-  switch (
-    color?.toLowerCase()
-  ) {
-
+const getDicePosition = (color?: string | null) => {
+  switch (color?.toLowerCase()) {
     case 'red':
       return 'topLeft';
 
@@ -463,9 +455,9 @@ const TeamCard = React.memo(
     const diceValueForUI = diceValue == null ? 1 : diceValue;
 
     const logo = getTeamLogo(player.teamName);
-const [rollingPlayers, setRollingPlayers] = useState<
-  Record<string, boolean>
->({});
+    const [rollingPlayers, setRollingPlayers] = useState<
+      Record<string, boolean>
+    >({});
     const lastMovedAt = player.lastMovedAt ?? null;
 
     return (
@@ -494,16 +486,12 @@ const [rollingPlayers, setRollingPlayers] = useState<
                 : '—'}
             </Text>
 
-       <Dice3DOther
-  diceValue={diceValue || 1}
-  size={32}
-  position={getDicePosition(player.color)}
-  isPlayerStartedRolling={
-    rollingPlayers[
-      player.playerId
-    ] || false
-  }
-/>
+            <Dice3DOther
+              diceValue={diceValue || 1}
+              size={32}
+              position={getDicePosition(player.color)}
+              isPlayerStartedRolling={rollingPlayers[player.playerId] || false}
+            />
 
             {logo ? (
               <Image
@@ -537,17 +525,12 @@ const [rollingPlayers, setRollingPlayers] = useState<
               />
             ) : null}
 
-           <Dice3DOther
-  diceValue={diceValue || 1}
-  size={32}
-  position={getDicePosition(player.color)}
-  isPlayerStartedRolling={
-    rollingPlayers[
-      player.playerId
-    ] || false
-  }
-/>
-
+            <Dice3DOther
+              diceValue={diceValue || 1}
+              size={32}
+              position={getDicePosition(player.color)}
+              isPlayerStartedRolling={rollingPlayers[player.playerId] || false}
+            />
 
             <Text style={styles.lastMovedText}>
               {lastMovedAt
@@ -568,8 +551,8 @@ const [rollingPlayers, setRollingPlayers] = useState<
 );
 
 export default function MyBoardScreen(): React.ReactElement {
-  const { session, user } = useAuth();
-  
+  const { session, user, setSession } = useAuth();
+  const baseUrl = session?.backendUrl || '';
   const isFlm = user?.role?.toLowerCase() === 'flm';
   const myFlmId = isFlm ? user?.id : user?.flmId;
   const [boardId, setBoardId] = useState<number | null>(null);
@@ -608,8 +591,10 @@ export default function MyBoardScreen(): React.ReactElement {
     [getPerspectiveArea],
   );
 
-  const creatorId = 'A1234';
-
+  // const creatorId = 'A1234';
+const creatorId =
+  user?.adminId || '';
+  
   const socketRef = useRef<Socket | null>(null);
   const pawnsRef = useRef<Pawn[]>([]);
   const [boardData, setBoardData] = useState<any>(null);
@@ -621,12 +606,9 @@ export default function MyBoardScreen(): React.ReactElement {
     useState<LoggedInMrStats | null>(null);
   const [currentDiceValue, setCurrentDiceValue] = useState<number | null>(null);
   const [isSelectingDice, setIsSelectingDice] = useState(false);
-  const [isRolling, setIsRolling] =
-  useState(false);
-  const [isMovePending, setIsMovePending] =
-  useState(false);
-  const boardShake =
-  useSharedValue(0);
+  const [isRolling, setIsRolling] = useState(false);
+  const [isMovePending, setIsMovePending] = useState(false);
+  const boardShake = useSharedValue(0);
   const navigation = useNavigation();
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState<string>('');
@@ -636,18 +618,14 @@ export default function MyBoardScreen(): React.ReactElement {
   >('info');
   const [alertButtons, setAlertButtons] = useState<AlertButton[]>([]);
 
+  const [selectedPawn, setSelectedPawn] = useState<Pawn | null>(null);
 
-  const [selectedPawn, setSelectedPawn] =
-  useState<Pawn | null>(null);
-
-const [menuPosition, setMenuPosition] =
-  useState({
+  const [menuPosition, setMenuPosition] = useState({
     x: 0,
     y: 0,
   });
 
-  const [showPawnMenu, setShowPawnMenu] =
-  useState(false);
+  const [showPawnMenu, setShowPawnMenu] = useState(false);
 
   const showAlert = (opts: {
     title?: string;
@@ -668,13 +646,11 @@ const [menuPosition, setMenuPosition] =
     closeAlert();
     fn?.();
   };
-const boardAnimatedStyle =
-  useAnimatedStyle(() => {
+  const boardAnimatedStyle = useAnimatedStyle(() => {
     return {
       transform: [
         {
-          translateX:
-            boardShake.value,
+          translateX: boardShake.value,
         },
       ],
     };
@@ -701,12 +677,11 @@ const boardAnimatedStyle =
 
   const fetchActivePlayers = async (bid: number) => {
     try {
-      const res = await fetch(
-        `${API_BASE_URL}/api/active-player/board/${bid}`,
-        {
-          headers: authHeaders(session?.token),
-        },
-      );
+      const baseUrl = await getBaseUrl();
+
+      const res = await fetch(`${baseUrl}/api/active-player/board/${bid}`, {
+        headers: authHeaders(session?.token),
+      });
       const json = await res.json();
 
       if (json?.success) {
@@ -736,7 +711,9 @@ const boardAnimatedStyle =
             style: 'destructive',
             onPress: withClose(async () => {
               try {
-                fetch(`${API_BASE_URL}/api/active-player/end`, {
+                const baseUrl = await getBaseUrl();
+
+                fetch(`${baseUrl}/api/active-player/end`, {
                   method: 'POST',
                   headers: {
                     ...authHeaders(session?.token),
@@ -774,8 +751,10 @@ const boardAnimatedStyle =
     if (!myFlmId) return;
     try {
       setLoading(true);
+      const baseUrl = await getBaseUrl();
+
       const activeRes = await fetch(
-        `${API_BASE_URL}/api/flm/${myFlmId}/boards/active`,
+        `${baseUrl}/api/flm/${myFlmId}/boards/active`,
         {
           headers: authHeaders(session?.token),
         },
@@ -787,6 +766,23 @@ const boardAnimatedStyle =
       }
       const activeBoard = activeJson.data[0];
       setBoardId(activeBoard.id);
+      console.log(
+  'ACTIVE BOARD =>',
+  activeBoard,
+);
+      if (session) {
+        setSession({
+          token: session.token,
+          user: session.user,
+          backendUrl: session.backendUrl,
+          businessUnit: session.businessUnit,
+
+          currentBoard: {
+            boardId: activeBoard.id,
+            myColor: 'blue',
+          },
+        });
+      }
       fetchBoardState(activeBoard.id);
       setLoading(false);
     } catch (e) {
@@ -796,7 +792,9 @@ const boardAnimatedStyle =
 
   const fetchBoardState = async (bid: number) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/flm/boards/navigate`, {
+      const baseUrl = await getBaseUrl();
+
+      const res = await fetch(`${baseUrl}/api/flm/boards/navigate`, {
         method: 'POST',
         headers: {
           ...authHeaders(session?.token),
@@ -831,9 +829,7 @@ const boardAnimatedStyle =
   // const sleep = (ms: number) =>
   //   new Promise<void>(resolve => setTimeout(() => resolve(), ms));
 
-// ✅ CORRECTED animatePawnMovement - Replace your existing function
-
-
+  // ✅ CORRECTED animatePawnMovement - Replace your existing function
 
   const buildRouteForColor = (color: PawnColor): string[] => {
     // Still used by UI elsewhere, but animation will now use backend-like step logic.
@@ -901,7 +897,9 @@ const boardAnimatedStyle =
     if (socketRef.current) {
       return;
     }
-    const socket = io(API_BASE_URL, {
+    const baseUrl = await getBaseUrl();
+
+    const socket = io(baseUrl, {
       transports: ['websocket'],
       reconnection: true,
       forceNew: true,
@@ -1157,8 +1155,8 @@ const boardAnimatedStyle =
 
           if (fromPos && fromPos !== toPos) {
             // Build an ordered route for this pawn color (same as UI route builder)
-            const route = ROUTES_BY_COLOR[updatedMovedPawn.color] ||
-              ROUTES_BY_COLOR.red;
+            const route =
+              ROUTES_BY_COLOR[updatedMovedPawn.color] || ROUTES_BY_COLOR.red;
 
             const fromIndex =
               fromPos === 'finished' ? route.length : route.indexOf(fromPos);
@@ -1168,51 +1166,35 @@ const boardAnimatedStyle =
             if (fromIndex !== -1 && toIndex !== -1) {
               const dir = toIndex > fromIndex ? 1 : -1;
 
-const totalSteps = Math.abs(
-  toIndex - fromIndex,
-);
+              const totalSteps = Math.abs(toIndex - fromIndex);
 
-movedPawnIdForDelay = String(
-  updatedMovedPawn.id,
-);
+              movedPawnIdForDelay = String(updatedMovedPawn.id);
 
-commitDelayMs =
-  totalSteps * 220 + 200;
+              commitDelayMs = totalSteps * 220 + 200;
 
-// IMPORTANT
-// use let INSIDE timeout loop
-for (
-  let step = 1;
-  step <= totalSteps;
-  step++
-) {
+              // IMPORTANT
+              // use let INSIDE timeout loop
+              for (let step = 1; step <= totalSteps; step++) {
+                const targetIndex = fromIndex + dir * step;
 
-  const targetIndex =
-    fromIndex + dir * step;
+                const pos =
+                  targetIndex >= route.length ? 'finished' : route[targetIndex];
 
-  const pos =
-    targetIndex >= route.length
-      ? 'finished'
-      : route[targetIndex];
+                setTimeout(async () => {
+                  await Promise.resolve();
 
-  setTimeout(async () => {
-
-  await Promise.resolve();
-
-  setPawns(prev =>
-    prev.map(p =>
-      String(p.id) ===
-      String(updatedMovedPawn.id)
-        ? {
-            ...p,
-            currentPosition: pos,
-          }
-        : p,
-    ),
-  );
-
-}, step * 260);
-}
+                  setPawns(prev =>
+                    prev.map(p =>
+                      String(p.id) === String(updatedMovedPawn.id)
+                        ? {
+                            ...p,
+                            currentPosition: pos,
+                          }
+                        : p,
+                    ),
+                  );
+                }, step * 260);
+              }
             }
           }
         }
@@ -1221,28 +1203,21 @@ for (
         // If we animated a specific pawn step-by-step, delay committing that pawn until animation ends.
         if (movedPawnIdForDelay) {
           setTimeout(() => {
+            setPawns(prev =>
+              prev.map(p => {
+                const updated = d.updatedPawns.find((u: any) => u.id === p.id);
 
-  setPawns(prev =>
-    prev.map(p => {
+                if (!updated) {
+                  return p;
+                }
 
-      const updated =
-        d.updatedPawns.find(
-          (u: any) =>
-            u.id === p.id,
-        );
-
-      if (!updated) {
-        return p;
-      }
-
-      return {
-        ...p,
-        ...updated,
-      };
-    }),
-  );
-
-}, commitDelayMs + 50);
+                return {
+                  ...p,
+                  ...updated,
+                };
+              }),
+            );
+          }, commitDelayMs + 50);
         } else {
           setPawns(prev =>
             prev.map(p => {
@@ -1283,126 +1258,126 @@ for (
     }, 1000);
     return () => clearTimeout(timer);
   }, [turnSecondsLeft]);
-// ✅ COMPLETE FIX: Replace your entire handleDiceRoll function with this
+  // ✅ COMPLETE FIX: Replace your entire handleDiceRoll function with this
 
-// ✅ FINAL CORRECTED handleDiceRoll - Removes all remaining delays
+  // ✅ FINAL CORRECTED handleDiceRoll - Removes all remaining delays
 
-const handleDiceRoll = () => {
-  if (!socketRef.current || !boardId) {
-    return;
-  }
-  if (isSelectingDice) {
-    return;
-  }
-  if (currentDiceValue) {
-    return;
-  }
-  if (isMovePending) {
-    return;
-  }
+  const handleDiceRoll = () => {
+    if (!socketRef.current || !boardId) {
+      return;
+    }
+    if (isSelectingDice) {
+      return;
+    }
+    if (currentDiceValue) {
+      return;
+    }
+    if (isMovePending) {
+      return;
+    }
 
-  setIsSelectingDice(true);
-  setIsRolling(true);
+    setIsSelectingDice(true);
+    setIsRolling(true);
 
-  const rolledValue = Math.floor(Math.random() * 6) + 1;
+    const rolledValue = Math.floor(Math.random() * 6) + 1;
 
-  // ✅ FIX #1: Show result IMMEDIATELY (instant feedback)
-  // User sees dice value right away, not after 850ms!
-  setCurrentDiceValue(rolledValue);
+    // ✅ FIX #1: Show result IMMEDIATELY (instant feedback)
+    // User sees dice value right away, not after 850ms!
+    setCurrentDiceValue(rolledValue);
 
-  socketRef.current.emit(
-    'rollDice',
-    {
-      boardId,
-      playerId: myFlmId,
-      userId: user?.id,
-      diceValue: rolledValue,
-      validMoves: true,
-    },
-    (response: any) => {
-      setIsSelectingDice(false);
+    socketRef.current.emit(
+      'rollDice',
+      {
+        boardId,
+        playerId: myFlmId,
+        userId: user?.id,
+        diceValue: rolledValue,
+        validMoves: true,
+      },
+      (response: any) => {
+        setIsSelectingDice(false);
 
-      if (!response?.ok) {
-        setIsRolling(false);
-        setCurrentDiceValue(null);  // Clear on error
-        showAlert({
-          title: 'Dice Error',
-          message: response?.msg || 'Failed to roll dice',
-          variant: 'error',
-          buttons: [{ text: 'OK', style: 'default', onPress: withClose() }],
-        });
-        return;
-      }
-
-      // ✅ FIX #2: Wait exactly 850ms for animation to complete
-      // This is the ONLY setTimeout - everything else runs immediately
-      setTimeout(() => {
-        // Stop the spinning animation
-        setIsRolling(false);
-        
-        // Update dice value only if server says something different
-        // (usually the client and server agree)
-        const serverDiceValue = Number(response.diceValue ?? rolledValue);
-        if (serverDiceValue !== rolledValue) {
-          setCurrentDiceValue(serverDiceValue);
+        if (!response?.ok) {
+          setIsRolling(false);
+          setCurrentDiceValue(null); // Clear on error
+          showAlert({
+            title: 'Dice Error',
+            message: response?.msg || 'Failed to roll dice',
+            variant: 'error',
+            buttons: [{ text: 'OK', style: 'default', onPress: withClose() }],
+          });
+          return;
         }
 
-        // ✅ Auto-move logic runs AFTER dice animation completes
-        const myPawns = pawnsRef.current.filter(
-          p => String(p.playerId) === String(myFlmId)
-        );
+        // ✅ FIX #2: Wait exactly 850ms for animation to complete
+        // This is the ONLY setTimeout - everything else runs immediately
+        setTimeout(() => {
+          // Stop the spinning animation
+          setIsRolling(false);
 
-        const dice = serverDiceValue;
-        
-       const movablePawns = myPawns.filter(p => {
-  // finished pawn cannot move
-  if (p.currentPosition === 'finished') {
-    return false;
-  }
+          // Update dice value only if server says something different
+          // (usually the client and server agree)
+          const serverDiceValue = Number(response.diceValue ?? rolledValue);
+          if (serverDiceValue !== rolledValue) {
+            setCurrentDiceValue(serverDiceValue);
+          }
 
-  // pawn in base requires 6
-  if (
-    (!p.currentPosition || p.currentPosition === '0') &&
-    dice !== 6
-  ) {
-    return false;
-  }
-
-  return true;
-});
-      }, 400);  // ✅ EXACTLY 850ms (matches Dice3D animation)
-
-      // ✅ FIX #3: Defer other state updates to avoid batching lag
-      // Move these to next microtask to prevent re-render thrashing
-      // This ensures the dice animation isn't blocked by heavy updates
-      Promise.resolve().then(() => {
-        // Update dice rows for other players
-        if (Array.isArray(response.allPlayersDice)) {
-          setDiceRows(normalizeDiceRows(response.allPlayersDice));
-        }
-        
-        // Update player stats
-        if (Array.isArray(response.updatedPlayers)) {
-          setPlayers(prev =>
-            prev.map(p => {
-              const updated = response.updatedPlayers.find(
-                (u: any) => String(u.playerId) === String(p.playerId),
-              );
-              return updated ? { ...p, ...updated } : p;
-            }),
+          // ✅ Auto-move logic runs AFTER dice animation completes
+          const myPawns = pawnsRef.current.filter(
+            p => String(p.playerId) === String(myFlmId),
           );
-        }
-        
-        // Update logged-in player stats
-        if (response.loggedInMrStats) {
-          setLoggedInMrStats(response.loggedInMrStats);
-        }
-      });
-    },
-  );
-};
 
-/*
+          const dice = serverDiceValue;
+
+          const movablePawns = myPawns.filter(p => {
+            // finished pawn cannot move
+            if (p.currentPosition === 'finished') {
+              return false;
+            }
+
+            // pawn in base requires 6
+            if (
+              (!p.currentPosition || p.currentPosition === '0') &&
+              dice !== 6
+            ) {
+              return false;
+            }
+
+            return true;
+          });
+        }, 400); // ✅ EXACTLY 850ms (matches Dice3D animation)
+
+        // ✅ FIX #3: Defer other state updates to avoid batching lag
+        // Move these to next microtask to prevent re-render thrashing
+        // This ensures the dice animation isn't blocked by heavy updates
+        Promise.resolve().then(() => {
+          // Update dice rows for other players
+          if (Array.isArray(response.allPlayersDice)) {
+            setDiceRows(normalizeDiceRows(response.allPlayersDice));
+          }
+
+          // Update player stats
+          if (Array.isArray(response.updatedPlayers)) {
+            setPlayers(prev =>
+              prev.map(p => {
+                const updated = response.updatedPlayers.find(
+                  (u: any) => String(u.playerId) === String(p.playerId),
+                );
+                return updated ? { ...p, ...updated } : p;
+              }),
+            );
+          }
+
+          // Update logged-in player stats
+          if (response.loggedInMrStats) {
+            setLoggedInMrStats(response.loggedInMrStats);
+          }
+        });
+      },
+    );
+  };
+
+  /*
 IMPROVEMENTS IN THIS VERSION:
 
 1. ✅ INSTANT FEEDBACK
@@ -1444,141 +1419,115 @@ TIMING BREAKDOWN:
 
 RESULT: No visible delay, smooth gameplay experience!
 */
-const getNextCellPositionBackendLike = (
-  currentPosition: string,
-  diceStep: number,
-  color: PawnColor,
-  type: string | undefined,
-) => {
-  // This function mirrors backend1/src/utils/handleFinalPos.js stepForward rules.
-  // For animation we don't need full pawn type transitions; we animate only forward cells
-  // for main/home track progression.
-  //
-  // Backend uses:
-  // - MAX_ID_PER_AREA = 18
-  // - jump: if cellNum === 7 and areaId !== homeAreaId => 13
-  // - if cellNum === 12 => center/finished
-  // - wrap: if nextCellNum > 18 => next area = (areaId % 4) + 1 and nextCellNum = 1
+  const getNextCellPositionBackendLike = (
+    currentPosition: string,
+    diceStep: number,
+    color: PawnColor,
+    type: string | undefined,
+  ) => {
+    // This function mirrors backend1/src/utils/handleFinalPos.js stepForward rules.
+    // For animation we don't need full pawn type transitions; we animate only forward cells
+    // for main/home track progression.
+    //
+    // Backend uses:
+    // - MAX_ID_PER_AREA = 18
+    // - jump: if cellNum === 7 and areaId !== homeAreaId => 13
+    // - if cellNum === 12 => center/finished
+    // - wrap: if nextCellNum > 18 => next area = (areaId % 4) + 1 and nextCellNum = 1
 
-  const AREAS = 4;
-  const MAX_ID_PER_AREA = 18;
-  const homeAreaIdByColor = HOME_AREA_BY_COLOR[color];
+    const AREAS = 4;
+    const MAX_ID_PER_AREA = 18;
+    const homeAreaIdByColor = HOME_AREA_BY_COLOR[color];
 
-  if (!currentPosition || currentPosition === '0') {
-    // from base: only handled outside; if called, just stay.
-    return '0';
-  }
+    if (!currentPosition || currentPosition === '0') {
+      // from base: only handled outside; if called, just stay.
+      return '0';
+    }
 
-  if (currentPosition === 'finished') return 'finished';
+    if (currentPosition === 'finished') return 'finished';
 
-  // Parse currentPosition
-  const parts = currentPosition.split('-');
-  const areaId = Number.parseInt(parts[2], 10);
-  const cellNum = Number.parseInt(parts[4], 10);
+    // Parse currentPosition
+    const parts = currentPosition.split('-');
+    const areaId = Number.parseInt(parts[2], 10);
+    const cellNum = Number.parseInt(parts[4], 10);
 
-  let nextCellNum: number | null = null;
-  let nextAreaId = areaId;
+    let nextCellNum: number | null = null;
+    let nextAreaId = areaId;
 
-  // jump logic matches backend handleFinalPos.js stepForward
-  if (cellNum === 7 && areaId !== homeAreaIdByColor) {
-    nextCellNum = 13;
-  } else if (cellNum === 12) {
-    nextCellNum = null; // reaches center
-  } else {
-    nextCellNum = cellNum + 1;
-  }
+    // jump logic matches backend handleFinalPos.js stepForward
+    if (cellNum === 7 && areaId !== homeAreaIdByColor) {
+      nextCellNum = 13;
+    } else if (cellNum === 12) {
+      nextCellNum = null; // reaches center
+    } else {
+      nextCellNum = cellNum + 1;
+    }
 
-  if (nextCellNum === null || nextAreaId == null) {
-    return 'finished';
-  }
+    if (nextCellNum === null || nextAreaId == null) {
+      return 'finished';
+    }
 
-  if (nextCellNum > MAX_ID_PER_AREA) {
-    nextCellNum = 1;
-    nextAreaId = (areaId % AREAS) + 1;
-  }
+    if (nextCellNum > MAX_ID_PER_AREA) {
+      nextCellNum = 1;
+      nextAreaId = (areaId % AREAS) + 1;
+    }
 
-  return `cell-area-${nextAreaId}-id-${nextCellNum}`;
-};
+    return `cell-area-${nextAreaId}-id-${nextCellNum}`;
+  };
 
-// Backward step should be computed from the same route array used for forward.
-// This guarantees true inverse stepping and avoids mismatches with special forward rules.
-const getPreviousCellPositionBackendLike = (
-  currentPosition: string,
-  color: PawnColor,
-) => {
-  if (!currentPosition || currentPosition === '0') {
-    return currentPosition;
-  }
-  if (currentPosition === 'finished') {
-    return currentPosition;
-  }
+  // Backward step should be computed from the same route array used for forward.
+  // This guarantees true inverse stepping and avoids mismatches with special forward rules.
+  const getPreviousCellPositionBackendLike = (
+    currentPosition: string,
+    color: PawnColor,
+  ) => {
+    if (!currentPosition || currentPosition === '0') {
+      return currentPosition;
+    }
+    if (currentPosition === 'finished') {
+      return currentPosition;
+    }
 
-  const route =
-    ROUTES_BY_COLOR[color] ||
-    ROUTES_BY_COLOR.red;
-  const idx = route.indexOf(currentPosition);
-  if (idx <= 0) {
-    return currentPosition;
-  }
+    const route = ROUTES_BY_COLOR[color] || ROUTES_BY_COLOR.red;
+    const idx = route.indexOf(currentPosition);
+    if (idx <= 0) {
+      return currentPosition;
+    }
 
-  return route[idx - 1];
-};
+    return route[idx - 1];
+  };
 
-const sleep = (ms: number) =>
-  new Promise<void>(resolve =>
-    setTimeout(() => resolve(), ms),
-  );
-const animateFrontendPawnMove =
-  async (
+  const sleep = (ms: number) =>
+    new Promise<void>(resolve => setTimeout(() => resolve(), ms));
+  const animateFrontendPawnMove = async (
     pawn: Pawn,
     diceValue: number,
     isBackward = false,
   ) => {
-
-    let currentPosition =
-      pawn.currentPosition;
+    let currentPosition = pawn.currentPosition;
 
     const steps: string[] = [];
 
     // BASE -> START
     if (
       !isBackward &&
-      (
-        !currentPosition ||
-        currentPosition === '0'
-      ) &&
+      (!currentPosition || currentPosition === '0') &&
       diceValue === 6
     ) {
+      currentPosition = `cell-area-${HOME_AREA_BY_COLOR[pawn.color]}-id-14`;
 
-      currentPosition =
-        `cell-area-${
-          HOME_AREA_BY_COLOR[
-            pawn.color
-          ]
-        }-id-14`;
-
-      steps.push(
-        currentPosition,
-      );
-
+      steps.push(currentPosition);
     } else {
-
-      for (
-        let i = 0;
-        i < diceValue;
-        i++
-      ) {
-
+      for (let i = 0; i < diceValue; i++) {
         // Backward steps: always use the same deterministic route array as forward
         // so the intermediate positions are guaranteed to map on the board.
         currentPosition = isBackward
           ? (() => {
-              if (!currentPosition || currentPosition === '0') return currentPosition;
+              if (!currentPosition || currentPosition === '0')
+                return currentPosition;
               if (currentPosition === 'finished') return currentPosition;
 
-              const route =
-                ROUTES_BY_COLOR[pawn.color] ||
-                ROUTES_BY_COLOR.red;
+              const route = ROUTES_BY_COLOR[pawn.color] || ROUTES_BY_COLOR.red;
 
               const idx = route.indexOf(currentPosition);
               if (idx <= 0) return currentPosition;
@@ -1591,36 +1540,24 @@ const animateFrontendPawnMove =
               pawn.type,
             );
 
-        steps.push(
-          currentPosition,
-        );
+        steps.push(currentPosition);
 
-        if (
-          currentPosition ===
-          'finished'
-        ) {
+        if (currentPosition === 'finished') {
           break;
         }
       }
     }
 
     // STEP BY STEP
-    for (
-      let i = 0;
-      i < steps.length;
-      i++
-    ) {
-
-      const position =
-        steps[i];
+    for (let i = 0; i < steps.length; i++) {
+      const position = steps[i];
 
       setPawns(prev =>
         prev.map(p =>
           p.id === pawn.id
             ? {
                 ...p,
-                currentPosition:
-                  position,
+                currentPosition: position,
               }
             : p,
         ),
@@ -1629,326 +1566,239 @@ const animateFrontendPawnMove =
       await sleep(140);
     }
   };
-  const handlePawnClick =  async (pawn: Pawn) => {
-  if (isMovePending) {
-  return;
-}
-
-setIsMovePending(true);
-  if (
-    !socketRef.current ||
-    !boardId ||
-    !currentDiceValue
-  ) {
-    return;
-  }
-
-  const diceValue =
-    currentDiceValue;
-
-  // ===== TAK TAK TAK frontend move (visual only) =====
-  // NOTE: direction for click animation is not fully known without backend move result.
-  // We keep click animation as forward (backend will correct via pawnMoved event).
-await animateFrontendPawnMove(
-  pawn,
-  diceValue,
-);
-
-  // ===== SOCKET IN BACKGROUND =====
-  socketRef.current.emit(
-    'movePawn',
-  {
-    boardId,
-    pawnId: pawn.id,
-    playerId: myFlmId,
-    userId: user?.id,
-    diceValue,
-  },
-  (response: any) => {
-
-    setIsMovePending(false);
-
-    if (!response?.ok) {
-
-      fetchBoardState(boardId);
-
-      showAlert({
-        title: 'Move Error',
-        message:
-          response?.msg ||
-          'Failed to move pawn',
-        variant: 'error',
-        buttons: [
-          {
-            text: 'OK',
-            style: 'default',
-            onPress: withClose(),
-          },
-        ],
-      });
-
+  const handlePawnClick = async (pawn: Pawn) => {
+    if (isMovePending) {
       return;
     }
 
-    setCurrentDiceValue(null);
-  },
-);
-
-// ✅ EMIT FIRST
-// ✅ UI UPDATE AFTER
-
-// animateFrontendPawnMove(
-//   pawn,
-//   diceValue,
-// );
-};
-
-
-const handleGiveHeart = (pawn: Pawn) => {
-  if (!socketRef.current || !boardId) return;
-
-  if (pawn.hasHeart === 1) {
-    Toast.show({ type: 'error', text2: 'Pawn already has heart' });
-    return;
-  }
-
-  // Backend only allows hearts on main board pawns (type === 'main')
-  // Frontend uses position as a guard; backend will still validate type.
-  if (!pawn.currentPosition || pawn.currentPosition === '0' || pawn.currentPosition === 'finished') {
-    Toast.show({ type: 'error', text2: 'Heart can only be given on board cells' });
-    return;
-  }
-
-  socketRef.current.emit(
-    'givePawnHeart',
-    {
-      boardId,
-      pawnId: pawn.id,
-      playerId: myFlmId,
-      userId: user?.id,
-    },
-    (response: any) => {
-      if (!response?.ok) {
-        Toast.show({
-          type: 'error',
-          text2: response?.msg || 'Failed to give heart',
-        });
-        return;
-      }
-
-      Toast.show({
-        type: 'success',
-        text2: 'Heart given successfully',
-      });
-    },
-  );
-};
-const renderBoardPawns = useMemo(() => {
-
-  // GROUP PAWNS BY POSITION
- const groupedPawns: Record<
-  string,
-  Pawn[]
-> = {};
-
-pawns
-  .filter(
-    pawn =>
-      pawn.currentPosition &&
-      pawn.currentPosition !== '0',
-  )
-  .forEach(pawn => {
-
-    let grid;
-
-    if (
-      pawn.currentPosition ===
-      'finished'
-    ) {
-      grid =
-        FINISH_POSITIONS[
-          getPerspectiveColor(
-            pawn.color,
-          )
-        ];
-    } else {
-      grid = positionToGrid(
-        getPerspectivePosition(
-          pawn.currentPosition,
-        ),
-        pawn.color,
-      );
+    setIsMovePending(true);
+    if (!socketRef.current || !boardId || !currentDiceValue) {
+      return;
     }
 
-    if (!grid) return;
+    const diceValue = currentDiceValue;
 
-    // ✅ GROUP USING GRID
-    const key =
-      `${grid[0]}-${grid[1]}`;
+    // ===== TAK TAK TAK frontend move (visual only) =====
+    // NOTE: direction for click animation is not fully known without backend move result.
+    // We keep click animation as forward (backend will correct via pawnMoved event).
+    await animateFrontendPawnMove(pawn, diceValue);
 
-    if (!groupedPawns[key]) {
-      groupedPawns[key] = [];
-    }
+    // ===== SOCKET IN BACKGROUND =====
+    socketRef.current.emit(
+      'movePawn',
+      {
+        boardId,
+        pawnId: pawn.id,
+        playerId: myFlmId,
+        userId: user?.id,
+        diceValue,
+      },
+      (response: any) => {
+        setIsMovePending(false);
 
-    groupedPawns[key].push(
-      pawn,
-    );
-  });
+        if (!response?.ok) {
+          fetchBoardState(boardId);
 
-  const elements: React.ReactElement[] =
-    [];
+          showAlert({
+            title: 'Move Error',
+            message: response?.msg || 'Failed to move pawn',
+            variant: 'error',
+            buttons: [
+              {
+                text: 'OK',
+                style: 'default',
+                onPress: withClose(),
+              },
+            ],
+          });
 
-  Object.values(groupedPawns).forEach(
-    sameCellPawns => {
-      sameCellPawns.forEach(
-        (pawn, index) => {
-          const perspectiveColor =
-            getPerspectiveColor(
-              pawn.color,
-            );
-
-          let grid;
-
-          if (
-            pawn.currentPosition ===
-            'finished'
-          ) {
-            grid =
-              FINISH_POSITIONS[
-                getPerspectiveColor(
-                  pawn.color,
-                )
-              ];
-          } else {
-            grid =
-              positionToGrid(
-                getPerspectivePosition(
-                  pawn.currentPosition,
-                ),
-                pawn.color,
-              );
-          }
-
-          if (!grid) return;
-
-          const pixel =
-            gridToPixel(
-              grid[0],
-              grid[1],
-            );
-
-          // ===== STACK OFFSET =====
-
-          const offsets = [
-            { x: 2, y: 2 },
-
-            { x: -2, y: 2 },
-
-            { x: 2, y: -2 },
-
-            { x: -2, y: 2 },
-
-            { x: 0, y:0 },
-          ];
-
-          const offset =
-  sameCellPawns.length > 1
-    ? offsets[index] || {
-        x: index * 3,
-        y: index * 3,
-      }
-    : { x: 0, y: 0 };
-
-          const isMyPawn =
-  String(pawn.playerId) ===
-    String(myFlmId) ||
-  String(pawn.playerId) ===
-    String(user?.id);
-          const isTouchable =
-  isMyPawn &&
-  !isMovePending;
-
-          elements.push(
-            <AnimatedPawn
-  key={pawn.id}
-  pawn={pawn}
-  left={
-    pixel.left +
-    offset.x
-  }
-  top={
-    pixel.top +
-    offset.y
-  }
-
-  image={
-    PAWN_IMAGES[
-      getPerspectiveColor(
-        pawn.color,
-      )
-    ]
-  }
-
-  // ✅ IMPORTANT
-  styles={styles}
-
-  // ✅ custom zIndex style
-  customStyle={{
-    zIndex:
-      pawn.color === 'blue'
-        ? 999
-        : pawn.color === 'red'
-        ? 4
-        : pawn.color === 'green'
-        ? 3
-        : 2,
-
-    elevation:
-      pawn.color === 'blue'
-        ? 999
-        : 1,
-  }}
-
-  isEligible={
-  isTouchable &&
-  !!currentDiceValue
-}
-
-onPress={
-  isTouchable
-    ? () => {
-        if (currentDiceValue) {
-          handlePawnClick(pawn);
-        } else {
-          setSelectedPawn(pawn);
-        setMenuPosition({
-  x:
-    pixel.left +
-    PAWN_SIZE / 2,
-
-  y: pixel.top,
-});
-          setShowPawnMenu(true);
+          return;
         }
-      }
-    : undefined
-}
-/>
-        
+
+        setCurrentDiceValue(null);
+      },
+    );
+
+    // ✅ EMIT FIRST
+    // ✅ UI UPDATE AFTER
+
+    // animateFrontendPawnMove(
+    //   pawn,
+    //   diceValue,
+    // );
+  };
+
+  const handleGiveHeart = (pawn: Pawn) => {
+    if (!socketRef.current || !boardId) return;
+
+    if (pawn.hasHeart === 1) {
+      Toast.show({ type: 'error', text2: 'Pawn already has heart' });
+      return;
+    }
+
+    // Backend only allows hearts on main board pawns (type === 'main')
+    // Frontend uses position as a guard; backend will still validate type.
+    if (
+      !pawn.currentPosition ||
+      pawn.currentPosition === '0' ||
+      pawn.currentPosition === 'finished'
+    ) {
+      Toast.show({
+        type: 'error',
+        text2: 'Heart can only be given on board cells',
+      });
+      return;
+    }
+
+    socketRef.current.emit(
+      'givePawnHeart',
+      {
+        boardId,
+        pawnId: pawn.id,
+        playerId: myFlmId,
+        userId: user?.id,
+      },
+      (response: any) => {
+        if (!response?.ok) {
+          Toast.show({
+            type: 'error',
+            text2: response?.msg || 'Failed to give heart',
+          });
+          return;
+        }
+
+        Toast.show({
+          type: 'success',
+          text2: 'Heart given successfully',
+        });
+      },
+    );
+  };
+  const renderBoardPawns = useMemo(() => {
+    // GROUP PAWNS BY POSITION
+    const groupedPawns: Record<string, Pawn[]> = {};
+
+    pawns
+      .filter(pawn => pawn.currentPosition && pawn.currentPosition !== '0')
+      .forEach(pawn => {
+        let grid;
+
+        if (pawn.currentPosition === 'finished') {
+          grid = FINISH_POSITIONS[getPerspectiveColor(pawn.color)];
+        } else {
+          grid = positionToGrid(
+            getPerspectivePosition(pawn.currentPosition),
+            pawn.color,
           );
-        },
-      );
-    },
-  );
+        }
 
-  return elements;
+        if (!grid) return;
 
-}, [
-  pawns,
-  currentDiceValue,
-  getPerspectiveColor,
-  getPerspectivePosition,
-]);
+        // ✅ GROUP USING GRID
+        const key = `${grid[0]}-${grid[1]}`;
+
+        if (!groupedPawns[key]) {
+          groupedPawns[key] = [];
+        }
+
+        groupedPawns[key].push(pawn);
+      });
+
+    const elements: React.ReactElement[] = [];
+
+    Object.values(groupedPawns).forEach(sameCellPawns => {
+      sameCellPawns.forEach((pawn, index) => {
+        const perspectiveColor = getPerspectiveColor(pawn.color);
+
+        let grid;
+
+        if (pawn.currentPosition === 'finished') {
+          grid = FINISH_POSITIONS[getPerspectiveColor(pawn.color)];
+        } else {
+          grid = positionToGrid(
+            getPerspectivePosition(pawn.currentPosition),
+            pawn.color,
+          );
+        }
+
+        if (!grid) return;
+
+        const pixel = gridToPixel(grid[0], grid[1]);
+
+        // ===== STACK OFFSET =====
+
+        const offsets = [
+          { x: 2, y: 2 },
+
+          { x: -2, y: 2 },
+
+          { x: 2, y: -2 },
+
+          { x: -2, y: 2 },
+
+          { x: 0, y: 0 },
+        ];
+
+        const offset =
+          sameCellPawns.length > 1
+            ? offsets[index] || {
+                x: index * 3,
+                y: index * 3,
+              }
+            : { x: 0, y: 0 };
+
+        const isMyPawn =
+          String(pawn.playerId) === String(myFlmId) ||
+          String(pawn.playerId) === String(user?.id);
+        const isTouchable = isMyPawn && !isMovePending;
+
+        elements.push(
+          <AnimatedPawn
+            key={pawn.id}
+            pawn={pawn}
+            left={pixel.left + offset.x}
+            top={pixel.top + offset.y}
+            image={PAWN_IMAGES[getPerspectiveColor(pawn.color)]}
+            // ✅ IMPORTANT
+            styles={styles}
+            // ✅ custom zIndex style
+            customStyle={{
+              zIndex:
+                pawn.color === 'blue'
+                  ? 999
+                  : pawn.color === 'red'
+                  ? 4
+                  : pawn.color === 'green'
+                  ? 3
+                  : 2,
+
+              elevation: pawn.color === 'blue' ? 999 : 1,
+            }}
+            isEligible={isTouchable && !!currentDiceValue}
+            onPress={
+              isTouchable
+                ? () => {
+                    if (currentDiceValue) {
+                      handlePawnClick(pawn);
+                    } else {
+                      setSelectedPawn(pawn);
+                      setMenuPosition({
+                        x: pixel.left + PAWN_SIZE / 2,
+
+                        y: pixel.top,
+                      });
+                      setShowPawnMenu(true);
+                    }
+                  }
+                : undefined
+            }
+          />,
+        );
+      });
+    });
+
+    return elements;
+  }, [pawns, currentDiceValue, getPerspectiveColor, getPerspectivePosition]);
 
   const renderBasePawns = useMemo(() => {
     const elements: React.ReactElement[] = [];
@@ -1968,32 +1818,21 @@ onPress={
         const pos = positions[i];
         if (!pos) return;
         const pixel = gridToPixel(pos[0], pos[1]);
-       const isMyPawn =
-  String(pawn.playerId) ===
-    String(myFlmId) ||
-  String(pawn.playerId) ===
-    String(user?.id);
-        const isTouchable =
-  isMyPawn &&
-  !isMovePending;
+        const isMyPawn =
+          String(pawn.playerId) === String(myFlmId) ||
+          String(pawn.playerId) === String(user?.id);
+        const isTouchable = isMyPawn && !isMovePending;
         elements.push(
           <AnimatedPawn
-  key={pawn.id}
-  pawn={pawn}
-  left={pixel.left}
-  top={pixel.top}
-  image={PAWN_IMAGES[getPerspectiveColor(pawn.color)]}
-  isEligible={
-  isTouchable &&
-  !!currentDiceValue
-}
-  onPress={
-  isTouchable
-    ? handlePawnClick.bind(null, pawn)
-    : undefined
-}
-  styles={styles}
-/>
+            key={pawn.id}
+            pawn={pawn}
+            left={pixel.left}
+            top={pixel.top}
+            image={PAWN_IMAGES[getPerspectiveColor(pawn.color)]}
+            isEligible={isTouchable && !!currentDiceValue}
+            onPress={isTouchable ? handlePawnClick.bind(null, pawn) : undefined}
+            styles={styles}
+          />,
         );
       });
     });
@@ -2112,21 +1951,20 @@ onPress={
         return;
       }
       try {
-        const checkRes = await fetch(
-          `${API_BASE_URL}/api/active-player/check`,
-          {
-            method: 'POST',
-            headers: {
-              ...authHeaders(session?.token),
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              boardId,
-              playerId: user?.id,
-              flmId: myFlmId,
-            }),
+        const baseUrl = await getBaseUrl();
+
+        const checkRes = await fetch(`${baseUrl}/api/active-player/check`, {
+          method: 'POST',
+          headers: {
+            ...authHeaders(session?.token),
+            'Content-Type': 'application/json',
           },
-        );
+          body: JSON.stringify({
+            boardId,
+            playerId: user?.id,
+            flmId: myFlmId,
+          }),
+        });
         const checkJson = await checkRes.json();
         if (!checkJson?.data?.canPlay) {
           showAlert({
@@ -2274,13 +2112,13 @@ onPress={
     turnState.mode !== 'turn' ||
     String(turnState.currentTurnPlayerId) === String(myFlmId);
   const canRollBlueDice =
-  bluePlayerExists &&
-  !isFlm &&
-  isMyTurn &&
-  !currentDiceValue &&
-  blueDiceBalance > 0 &&
-  !isSelectingDice &&
-  !isMovePending;
+    bluePlayerExists &&
+    !isFlm &&
+    isMyTurn &&
+    !currentDiceValue &&
+    blueDiceBalance > 0 &&
+    !isSelectingDice &&
+    !isMovePending;
   return (
     <SafeAreaView style={styles.container}>
       <View>
@@ -2408,12 +2246,7 @@ onPress={
           />
         </View>
         {/* CENTER: LUDO BOARD SECTION */}
-        <Animated.View
-  style={[
-    styles.boardContainer,
-    boardAnimatedStyle,
-  ]}
->
+        <Animated.View style={[styles.boardContainer, boardAnimatedStyle]}>
           <Image
             source={require('../assets/gameAssets/ludo-board.png')}
             style={styles.boardImage}
@@ -2678,27 +2511,22 @@ onPress={
                 flex: 1,
                 gap: s(8),
                 paddingTop: s(4),
-                width:s(24),
-                height:s(24)
+                width: s(24),
+                height: s(24),
               }}
             >
-            <Dice3D
-  value={currentDiceValue || 1}
-  rolling={isRolling}
-
-  // ✅ disable touch while pending
-  onPress={() => {
-    if (
-      canRollBlueDice &&
-      !isMovePending
-    ) {
-      handleDiceRoll();
-    }
-  }}
-
-  // ✅ optional visual dim
-  disabled={isMovePending}
-/>
+              <Dice3D
+                value={currentDiceValue || 1}
+                rolling={isRolling}
+                // ✅ disable touch while pending
+                onPress={() => {
+                  if (canRollBlueDice && !isMovePending) {
+                    handleDiceRoll();
+                  }
+                }}
+                // ✅ optional visual dim
+                disabled={isMovePending}
+              />
               {turnState?.mode === 'turn' && (
                 <Text
                   style={{
@@ -2761,7 +2589,7 @@ onPress={
         userId={user?.id}
       />
 
-<AlertModal
+      <AlertModal
         visible={alertVisible}
         title={alertTitle}
         message={alertMessage}
@@ -2771,89 +2599,81 @@ onPress={
       />
 
       <Modal
-  visible={showPawnMenu}
-  transparent
-  animationType="fade"
-  onRequestClose={() => {
-    setShowPawnMenu(false);
-  }}
->
-  <TouchableOpacity
-    activeOpacity={1}
-    onPress={() => {
-      setShowPawnMenu(false);
-    }}
-    style={{
-      flex: 1,
-    }}
-  >
-    <View
-      style={{
-        position: 'absolute',
-
-        left:
-          menuPosition.x -
-          s(12),
-
-        top:
-          menuPosition.y -
-          s(-250),
-
-        backgroundColor:
-          'rgba(255,255,255,0.97)',
-
-        borderRadius: s(12),
-
-        paddingVertical: s(10),
-
-        paddingHorizontal: s(14),
-
-        shadowColor: '#000',
-
-        shadowOpacity: 0.22,
-
-        shadowRadius: 10,
-
-        shadowOffset: {
-          width: 0,
-          height: 4,
-        },
-
-        elevation: 14,
-
-        borderWidth: 1,
-
-        borderColor:
-          'rgba(255,255,255,0.35)',
-      }}
-    >
-      <TouchableOpacity
-        activeOpacity={0.8}
-        onPress={() => {
+        visible={showPawnMenu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
           setShowPawnMenu(false);
-
-          if (selectedPawn) {
-            handleGiveHeart(
-              selectedPawn,
-            );
-          }
         }}
       >
-        <Text
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={() => {
+            setShowPawnMenu(false);
+          }}
           style={{
-            color: '#222',
-
-            fontWeight: '800',
-
-            fontSize: s(13),
+            flex: 1,
           }}
         >
-          ❤️ Give Heart
-        </Text>
-      </TouchableOpacity>
-    </View>
-  </TouchableOpacity>
-</Modal>
+          <View
+            style={{
+              position: 'absolute',
+
+              left: menuPosition.x - s(12),
+
+              top: menuPosition.y - s(-250),
+
+              backgroundColor: 'rgba(255,255,255,0.97)',
+
+              borderRadius: s(12),
+
+              paddingVertical: s(10),
+
+              paddingHorizontal: s(14),
+
+              shadowColor: '#000',
+
+              shadowOpacity: 0.22,
+
+              shadowRadius: 10,
+
+              shadowOffset: {
+                width: 0,
+                height: 4,
+              },
+
+              elevation: 14,
+
+              borderWidth: 1,
+
+              borderColor: 'rgba(255,255,255,0.35)',
+            }}
+          >
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => {
+                setShowPawnMenu(false);
+
+                if (selectedPawn) {
+                  handleGiveHeart(selectedPawn);
+                }
+              }}
+            >
+              <Text
+                style={{
+                  color: '#222',
+
+                  fontWeight: '800',
+
+                  fontSize: s(13),
+                }}
+              >
+                ❤️ Give Heart
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }

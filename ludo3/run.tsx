@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { io, Socket } from 'socket.io-client';
-import { API_BASE_URL, authHeaders } from '../api';
+import { authHeaders } from '../api';
 import { useAuth } from '../auth/AuthContext';
 
 const { width: W } = Dimensions.get('window');
@@ -460,6 +460,7 @@ const COLOR_ACCENT: Record<PawnColor, string> = {
 // ─── component ────────────────────────────────────────────────────────────────
 export default function RunScreen() {
   const { session, user } = useAuth();
+  const baseUrl = session?.backendUrl || '';
   const isFlm = user?.role?.toLowerCase() === 'flm';
   const myFlmId = isFlm ? user?.id : user?.flmId;
   const [boardId, setBoardId] = useState<number | null>(null);
@@ -513,7 +514,7 @@ export default function RunScreen() {
 
     try {
       const res = await fetch(
-        `${API_BASE_URL}/api/notifications?boardId=${bid}`,
+        `${baseUrl}/api/notifications?boardId=${bid}`,
         {
           headers: authHeaders(session?.token),
         },
@@ -532,7 +533,7 @@ export default function RunScreen() {
     if (!myFlmId) return;
     try {
       const res = await fetch(
-        `${API_BASE_URL}/api/flm/${myFlmId}/boards/active`,
+        `${baseUrl}/api/flm/${myFlmId}/boards/active`,
         {
           headers: authHeaders(session?.token),
         },
@@ -554,7 +555,7 @@ export default function RunScreen() {
     }
   }, [myFlmId, session?.token]);
   const fetchBoardStatus = async () => {
-    const res = await fetch(`${API_BASE_URL}/api/flm/boards/status`, {
+    const res = await fetch(`${baseUrl}/api/flm/boards/status`, {
       method: 'POST',
       headers: {
         ...authHeaders(session?.token),
@@ -573,7 +574,7 @@ export default function RunScreen() {
   };
   const fetchBoardState = async (bid: number) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/flm/board/${myFlmId}`, {
+      const res = await fetch(`${baseUrl}/api/flm/board/${myFlmId}`, {
         headers: authHeaders(session?.token),
       });
       const json = await res.json();
@@ -776,7 +777,7 @@ export default function RunScreen() {
   useEffect(() => {
     if (!boardId) return;
 
-    const socket = io(API_BASE_URL, {
+    const socket = io(baseUrl, {
       transports: ['websocket'],
       reconnection: true,
     });

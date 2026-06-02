@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import { io, Socket } from 'socket.io-client';
-import { API_BASE_URL, authHeaders } from '../api';
+import { getBaseUrl, authHeaders } from '../api';
 import { useAuth } from '../auth/AuthContext';
 
 const { width: W } = Dimensions.get('window');
@@ -189,6 +189,7 @@ const renderLogo = (team?: string | null, style?: any) => {
 
 const LeaderboardScreen: React.FC = () => {
   const { session, user } = useAuth();
+  const baseUrl = session?.backendUrl || '';
   const [activeTab, setActiveTab] = useState<RankTab>('Team Rank');
   const [activeMonth, setActiveMonth] = useState(MONTHS[new Date().getMonth()]);
   const [activeFilter, setActiveFilter] = useState<RankFilter>('both');
@@ -223,7 +224,7 @@ const LeaderboardScreen: React.FC = () => {
       params.set('endDate', range.endDate);
     }
 
-    return `${API_BASE_URL}${endpoint}?${params.toString()}`;
+    return `${baseUrl}${endpoint}?${params.toString()}`;
   }, [activeMonth, activeTab, sortBy, user?.id, user?.role]);
 
   const loadLeaderboard = useCallback(async () => {
@@ -274,7 +275,7 @@ const LeaderboardScreen: React.FC = () => {
   }, [loadLeaderboard]);
 
   useEffect(() => {
-    const socket: Socket = io(API_BASE_URL, {
+    const socket: Socket = io(baseUrl, {
       transports: ['websocket'],
       reconnection: true,
       reconnectionAttempts: 10,

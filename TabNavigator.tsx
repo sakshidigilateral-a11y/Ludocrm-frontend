@@ -9,16 +9,15 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 
 import AlertModal, { AlertButton } from './components/AlertModal';
 
-
-import Dashboard from './ludo2/dashboard';
-import Rank from './ludo2/rank';
+import Dashboard from './ludo3/dashboard';
+import Rank from './ludo3/rank';
 import Notification from './ludo2/notification';
-import Run from './ludo2/run';
-import NewUpload from './ludo2/newupload';
+import Run from './ludo3/run';
+import NewUpload from './ludo3/newupload';
 
 import Upload from './ludo2/uploads';
 
-import { API_BASE_URL, authHeaders } from './api';
+import {  authHeaders, getBaseUrl } from './api';
 
 const isMrUser = (role?: string | null) =>
   String(role || '').toLowerCase() === 'mr';
@@ -35,7 +34,7 @@ const isCurrentUserActiveOnBoard = async () => {
 
   try {
     const res = await fetch(
-      `${API_BASE_URL}/api/active-player/board/${boardId}`,
+      `${getBaseUrl}/api/active-player/board/${boardId}`,
       {
         headers: authHeaders((globalThis as any).sessionToken),
       },
@@ -58,7 +57,10 @@ const isCurrentUserActiveOnBoard = async () => {
 const TabNavigator = () => {
   const Tab = createBottomTabNavigator();
 
-  const { user } = useAuth();
+ const { user, session } = useAuth();
+
+const baseUrl =
+  session?.backendUrl || '';
   const showNewUpload = isMrUser(user?.role);
 
 
@@ -108,7 +110,7 @@ const TabNavigator = () => {
 
       yesActionRef.current = async () => {
         try {
-          await fetch(`${API_BASE_URL}/api/active-player/end`, {
+          await fetch(`${baseUrl}/api/active-player/end`, {
             method: 'POST',
             headers: {
               ...authHeaders((globalThis as any).sessionToken),

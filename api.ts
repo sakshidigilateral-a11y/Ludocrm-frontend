@@ -1,11 +1,22 @@
-import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export const API_BASE_URL =
-  Platform.OS === 'android'
-    ? 'http://192.168.1.23:4451'
-    : 'http://localhost:4450';
+export const getBaseUrl = async () => {
+  const backendUrl =
+    await AsyncStorage.getItem('backendUrl');
+
+  return backendUrl || '';
+};
+
+export const getToken = async () => {
+  const token = await AsyncStorage.getItem('token');
+  return token || '';
+};
 
 export const authHeaders = (token?: string) => ({
   'Content-Type': 'application/json',
-  ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  ...(token
+    ? {
+        Authorization: `Bearer ${token}`,
+      }
+    : {}),
 });

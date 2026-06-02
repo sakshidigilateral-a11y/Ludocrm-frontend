@@ -21,7 +21,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { io, Socket } from 'socket.io-client';
-import { API_BASE_URL, authHeaders } from '../api';
+import { getBaseUrl, authHeaders } from '../api';
 import { useAuth } from '../auth/AuthContext';
 import DiceOne from '../assets/dice1.png';
 import DiceTwo from '../assets/dice2.png';
@@ -419,6 +419,7 @@ function gridToPixel(col: number, row: number) {
 // ─── MAIN COMPONENT ───
 export default function OtherBoardScreen(): ReactElement {
   const { session, user } = useAuth();
+  const baseUrl = session?.backendUrl || '';
   const isFlm = user?.role?.toLowerCase() === 'flm';
   const myFlmId = isFlm ? user?.id : user?.flmId;
 const [rollingPlayers, setRollingPlayers] = useState<
@@ -445,7 +446,7 @@ const [rollingPlayers, setRollingPlayers] = useState<
   // ─── FETCH OTHER BOARDS ───
   const fetchOtherBoards = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/flm/boards/status`, {
+      const res = await fetch(`${baseUrl}/api/flm/boards/status`, {
         method: 'POST',
         headers: {
           ...authHeaders(session?.token),
@@ -488,7 +489,7 @@ const [rollingPlayers, setRollingPlayers] = useState<
   const fetchBoardState = useCallback(
     async (bid: number) => {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/flm/boards/navigate`, {
+        const res = await fetch(`${baseUrl}/api/flm/boards/navigate`, {
           method: 'POST',
           headers: {
             ...authHeaders(session?.token),
@@ -660,7 +661,7 @@ const [rollingPlayers, setRollingPlayers] = useState<
   useEffect(() => {
     if (!displayBoardId) return;
 
-    const socket = io(API_BASE_URL, {
+    const socket = io(baseUrl, {
       transports: ['websocket'],
       reconnection: true,
     });

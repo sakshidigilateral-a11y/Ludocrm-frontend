@@ -15,7 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { io, Socket } from 'socket.io-client';
-import { API_BASE_URL, authHeaders } from '../api';
+import { authHeaders } from '../api';
 import { useAuth } from '../auth/AuthContext';
 import DiceOne from '../assets/dice1.png';
 import DiceTwo from '../assets/dice2.png';
@@ -23,7 +23,7 @@ import DiceThree from '../assets/dice3.png';
 import DiceFour from '../assets/dice4.png';
 import DiceFive from '../assets/dice5.png';
 import DiceSix from '../assets/dice6.png';
-import { useNavigation, } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import Chat from './chat';
 import AlertModal, { AlertButton } from '../components/AlertModal';
 import Toast from 'react-native-toast-message';
@@ -368,7 +368,9 @@ const normalizeDiceRows = (rows?: any[]): DiceByPlayerRow[] =>
   (Array.isArray(rows) ? rows : []).map((d: any) => ({
     playerId: String(d.teamPlayerId || d.playerId),
     teamId:
-      d.teamId === null || d.teamId === undefined ? undefined : String(d.teamId),
+      d.teamId === null || d.teamId === undefined
+        ? undefined
+        : String(d.teamId),
     diceValue:
       d.diceValue === null || d.diceValue === undefined
         ? null
@@ -407,52 +409,60 @@ function gridToPixel(col: number, row: number) {
 }
 
 export default function MyBoardScreen(): React.ReactElement {
-  
   const { session, user } = useAuth();
+  const baseUrl = session?.backendUrl || '';
   const isFlm = user?.role?.toLowerCase() === 'flm';
-  const myFlmId = isFlm ? user?.id : user?.flmId;
 
+  const myFlmId = user?.flmId;
+
+  const myPlayerIdForDice = user?.flmId;
+  console.log('USER =>', user);
+  console.log('isFlm =>', isFlm);
+  console.log('myFlmId =>', myFlmId);
+  console.log('myPlayerIdForDice =>', myPlayerIdForDice);
+  console.log('user.id =>', user?.id);
+  console.log('user.flmId =>', user?.flmId);
+  console.log('user.mrId =>', user?.mrId);
+  console.log('user.MrID =>', user?.MrID);
   const [boardId, setBoardId] = useState<number | null>(null);
   const [pawns, setPawns] = useState<Pawn[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
   const [diceRows, setDiceRows] = useState<DiceByPlayerRow[]>([]);
-  const myPlayerIdForDice = isFlm ? myFlmId : user?.id;
+
   const myPlayerColor =
-  players.find(p => p.playerId === myFlmId)?.color || 'blue';
+    players.find(p => p.playerId === myFlmId)?.color || 'blue';
 
-const getPerspectiveArea = useCallback(
-  (area: number) => {
-    if (!myPlayerColor) return area;
+  const getPerspectiveArea = useCallback(
+    (area: number) => {
+      if (!myPlayerColor) return area;
 
-    return ((area - HOME_AREA_BY_COLOR[myPlayerColor] + 4) % 4) + 1;
-  },
-  [myPlayerColor],
-);
+      return ((area - HOME_AREA_BY_COLOR[myPlayerColor] + 4) % 4) + 1;
+    },
+    [myPlayerColor],
+  );
 
-const getPerspectiveColor = useCallback(
-  (color?: string | null): PawnColor => {
-    if (!isPawnColor(color)) return 'blue';
+  const getPerspectiveColor = useCallback(
+    (color?: string | null): PawnColor => {
+      if (!isPawnColor(color)) return 'blue';
 
-    return COLOR_BY_HOME_AREA[
-      getPerspectiveArea(HOME_AREA_BY_COLOR[color])
-    ];
-  },
-  [getPerspectiveArea],
-);
+      return COLOR_BY_HOME_AREA[getPerspectiveArea(HOME_AREA_BY_COLOR[color])];
+    },
+    [getPerspectiveArea],
+  );
 
-const getPerspectivePosition = useCallback(
-  (position?: string | number | null) => {
-    const normalized = String(position ?? '').trim();
+  const getPerspectivePosition = useCallback(
+    (position?: string | number | null) => {
+      const normalized = String(position ?? '').trim();
 
-    return normalized.replace(
-      /(cell-area-|home-area-)(\d+)(-id-\d+)/,
-      (_match, prefix, area, suffix) =>
-        `${prefix}${getPerspectiveArea(Number(area))}${suffix}`,
-    );
-  },
-  [getPerspectiveArea],
-);
+      return normalized.replace(
+        /(cell-area-|home-area-)(\d+)(-id-\d+)/,
+        (_match, prefix, area, suffix) =>
+          `${prefix}${getPerspectiveArea(Number(area))}${suffix}`,
+      );
+    },
+    [getPerspectiveArea],
+  );
 
   const socketRef = useRef<Socket | null>(null);
   const creatorId = 'S1101';
@@ -460,10 +470,9 @@ const getPerspectivePosition = useCallback(
   const pawnsRef = useRef<Pawn[]>([]);
   const [boardData, setBoardData] = useState<any>(null);
   const [activePlayers, setActivePlayers] = useState<any[]>([]);
-const [showChat, setShowChat] =
-  useState(false);
+  const [showChat, setShowChat] = useState(false);
   const usedDiceUploadIdRef = useRef<string | null>(null);
-  
+
   const [currentDiceValue, setCurrentDiceValue] = useState<number | null>(null);
 
   const [selectedUploadId, setSelectedUploadId] = useState<string | null>(null);
@@ -475,9 +484,10 @@ const [showChat, setShowChat] =
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState<string>('');
   const [alertMessage, setAlertMessage] = useState<string>('');
-  const [alertVariant, setAlertVariant] = useState<'info' | 'error' | 'confirm'>('info');
+  const [alertVariant, setAlertVariant] = useState<
+    'info' | 'error' | 'confirm'
+  >('info');
   const [alertButtons, setAlertButtons] = useState<AlertButton[]>([]);
-
 
   const showAlert = (opts: {
     title?: string;
@@ -492,15 +502,12 @@ const [showChat, setShowChat] =
     setAlertVisible(true);
   };
 
-  
   const closeAlert = () => setAlertVisible(false);
 
-  const withClose =
-    (fn?: () => void) =>
-    () => {
-      closeAlert();
-      fn?.();
-    };
+  const withClose = (fn?: () => void) => () => {
+    closeAlert();
+    fn?.();
+  };
   useEffect(() => {
     (globalThis as any).boardId = boardId;
 
@@ -516,29 +523,23 @@ const [showChat, setShowChat] =
       activePlayers.some(
         player =>
           String(player.boardId) === String(boardId) &&
-          String(player.playerId) === String(user?.id) &&
-          String(player.flmId) === String(myFlmId),
+          String(player.playerId) === String(user?.id),
       );
 
     (globalThis as any).isMyBoardActivePlayer = isActiveOnMyBoard;
   }, [activePlayers, boardId, myFlmId, user?.id]);
   const fetchActivePlayers = async (bid: number) => {
     try {
-      const res = await fetch(
-        `${API_BASE_URL}/api/active-player/board/${bid}`,
-        {
-          headers: authHeaders(session?.token),
-        },
-      );
+      const res = await fetch(`${baseUrl}/api/active-player/board/${bid}`, {
+        headers: authHeaders(session?.token),
+      });
 
       const json = await res.json();
-
+      // console.log('Active players responseeeeeeeeeee =>', json);
       if (json?.success) {
         setActivePlayers(json.data || []);
       }
-    } catch (err) {
-
-    }
+    } catch (err) {}
   };
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', e => {
@@ -563,7 +564,7 @@ const [showChat, setShowChat] =
             style: 'destructive',
             onPress: withClose(async () => {
               try {
-                fetch(`${API_BASE_URL}/api/active-player/end`, {
+                fetch(`${baseUrl}/api/active-player/end`, {
                   method: 'POST',
                   headers: {
                     ...authHeaders(session?.token),
@@ -571,7 +572,7 @@ const [showChat, setShowChat] =
                   },
                   body: JSON.stringify({
                     boardId,
-                    playerId: user?.id,
+                    playerId: playerId,
                     playerRole: user?.role,
                     flmId: myFlmId,
                   }),
@@ -579,10 +580,14 @@ const [showChat, setShowChat] =
 
                 socketRef.current?.emit('playerLeft', {
                   boardId,
-                  playerId: myFlmId,
+                  playerId: myPlayerIdForDice,
                   userId: user?.id,
                 });
-
+                console.log('Emitted playerLeft event with =>', {
+                  boardId,
+                  playerId: myPlayerIdForDice,
+                  userId: user?.id,
+                });
                 (globalThis as any).isMyBoardActivePlayer = false;
                 (globalThis as any).boardId = null;
 
@@ -610,12 +615,12 @@ const [showChat, setShowChat] =
       setLoading(true);
 
       const activeRes = await fetch(
-        `${API_BASE_URL}/api/flm/${myFlmId}/boards/active`,
+        `${baseUrl}/api/flm/${myFlmId}/boards/active`,
         {
           headers: authHeaders(session?.token),
         },
       );
-
+      console.log('Active board responseeeee =>', activeRes);
       const activeJson = await activeRes.json();
 
       if (!activeJson.success || !activeJson.data?.length) {
@@ -626,6 +631,39 @@ const [showChat, setShowChat] =
       const activeBoard = activeJson.data[0];
 
       setBoardId(activeBoard.id);
+
+      await fetch(`${baseUrl}/api/active-player/set`, {
+        method: 'POST',
+        headers: {
+          ...authHeaders(session?.token),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          boardId: activeBoard.id,
+          playerId: user?.id,
+          playerRole: user?.role,
+          flmId: myFlmId,
+        }),
+      });
+      console.log('USER =>', user);
+      // AUTO REGISTER ACTIVE PLAYER
+      await fetch(`${baseUrl}/api/active-player/set`, {
+        method: 'POST',
+        headers: {
+          ...authHeaders(session?.token),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          boardId: activeBoard.id,
+          playerId: user?.id,
+          playerRole: user?.role,
+          flmId: myFlmId,
+        }),
+      });
+      console.log('USER =>', user);
+
+      console.log('AUTO ACTIVE PLAYER REGISTERED');
+
       fetchBoardState(activeBoard.id);
 
       setLoading(false);
@@ -638,7 +676,7 @@ const [showChat, setShowChat] =
 
   const fetchBoardState = async (bid: number) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/flm/boards/navigate`, {
+      const res = await fetch(`${baseUrl}/api/flm/boards/navigate`, {
         method: 'POST',
         headers: {
           ...authHeaders(session?.token),
@@ -657,12 +695,16 @@ const [showChat, setShowChat] =
       setPawns(json.data.pawns || []);
       setPlayers(json.data.players || []);
       setBoardData(json.data);
-
+      console.log('FULL BOARD DATA =>', JSON.stringify(json.data, null, 2));
       const incomingDiceRows = normalizeDiceRows(
         json.data.diceValue || json.data.allPlayersDice || [],
       );
 
       setDiceRows(incomingDiceRows);
+      console.log(
+        'FETCH DICE ROWS =>',
+        JSON.stringify(incomingDiceRows, null, 2),
+      );
       const unplayed = (json.data?.unplayedDiceValue ??
         json.data?.unplayedDiceValues ??
         null) as number | number[] | null;
@@ -723,80 +765,74 @@ const [showChat, setShowChat] =
     }
   };
 
-const buildRouteForColor = (color: PawnColor): string[] => {
-  const homeAreaId = HOME_AREA_BY_COLOR[color] ?? 1;
-  const route: string[] = [];
+  const buildRouteForColor = (color: PawnColor): string[] => {
+    const homeAreaId = HOME_AREA_BY_COLOR[color] ?? 1;
+    const route: string[] = [];
 
-  const getNextRouteCell = (areaId: number, cellNum: number) => {
-    if (cellNum === 7 && areaId !== homeAreaId) {
-      return { areaId, cellNum: 13 };
+    const getNextRouteCell = (areaId: number, cellNum: number) => {
+      if (cellNum === 7 && areaId !== homeAreaId) {
+        return { areaId, cellNum: 13 };
+      }
+
+      let nextAreaId = areaId;
+      let nextCellNum = cellNum + 1;
+
+      if (nextCellNum > 18) {
+        nextCellNum = 1;
+        nextAreaId = (areaId % 4) + 1;
+      }
+
+      return { areaId: nextAreaId, cellNum: nextCellNum };
+    };
+
+    let areaId = homeAreaId;
+    let cellNum = 14;
+
+    while (true) {
+      route.push(`cell-area-${areaId}-id-${cellNum}`);
+
+      if (areaId === homeAreaId && cellNum === 12) {
+        break;
+      }
+
+      const next = getNextRouteCell(areaId, cellNum);
+      areaId = next.areaId;
+      cellNum = next.cellNum;
+
+      if (route.length > 100) {
+        break;
+      }
     }
 
-    let nextAreaId = areaId;
-    let nextCellNum = cellNum + 1;
-
-    if (nextCellNum > 18) {
-      nextCellNum = 1;
-      nextAreaId = (areaId % 4) + 1;
-    }
-
-    return { areaId: nextAreaId, cellNum: nextCellNum };
+    return route;
   };
 
-  let areaId = homeAreaId;
-  let cellNum = 14;
+  const ROUTES_BY_COLOR: Record<string, string[]> = {
+    red: buildRouteForColor('red'),
+    blue: buildRouteForColor('blue'),
+    green: buildRouteForColor('green'),
+    yellow: buildRouteForColor('yellow'),
+  };
 
-  while (true) {
-    route.push(`cell-area-${areaId}-id-${cellNum}`);
-
-    if (areaId === homeAreaId && cellNum === 12) {
-      break;
+  const getNextCellPosition = (currentPosition: string, color: string) => {
+    if (currentPosition === 'finished') {
+      return 'finished';
     }
 
-    const next = getNextRouteCell(areaId, cellNum);
-    areaId = next.areaId;
-    cellNum = next.cellNum;
+    const route = ROUTES_BY_COLOR[color] || ROUTES_BY_COLOR.red;
 
-    if (route.length > 100) {
-      break;
+    const currentIndex = route.indexOf(currentPosition);
+
+    if (currentIndex === -1) {
+      return currentPosition;
     }
-  }
 
-  return route;
-};
+    if (currentIndex === route.length - 1) {
+      return 'finished';
+    }
 
-const ROUTES_BY_COLOR: Record<string, string[]> = {
-  red: buildRouteForColor('red'),
-  blue: buildRouteForColor('blue'),
-  green: buildRouteForColor('green'),
-  yellow: buildRouteForColor('yellow'),
-};
-
-const getNextCellPosition = (
-  currentPosition: string,
-  color: string,
-) => {
-  if (currentPosition === 'finished') {
-    return 'finished';
-  }
-
-  const route =
-    ROUTES_BY_COLOR[color] ||
-    ROUTES_BY_COLOR.red;
-
-  const currentIndex =
-    route.indexOf(currentPosition);
-
-  if (currentIndex === -1) {
-    return currentPosition;
-  }
-
-  if (currentIndex === route.length - 1) {
-    return 'finished';
-  }
-
-  return route[currentIndex + 1];
-};
+    return route[currentIndex + 1];
+  };
 
   useEffect(() => {
     fetchBoard();
@@ -812,7 +848,7 @@ const getNextCellPosition = (
       return;
     }
 
-    const socket = io(API_BASE_URL, {
+    const socket = io(baseUrl, {
       transports: ['websocket'],
       reconnection: true,
       forceNew: true,
@@ -821,7 +857,6 @@ const getNextCellPosition = (
     socketRef.current = socket;
 
     socket.on('connect', () => {
-
       socket.emit(
         'joinGame',
         {
@@ -829,10 +864,12 @@ const getNextCellPosition = (
           playerId: myFlmId,
           userId: user?.id,
         },
-        (response: any) => {
 
+        console.log('playerid', myPlayerIdForDice),
+        console.log('userid', user?.id),
+        (response: any) => {
           if (!response?.ok) {
-            // console.log('❌ Join failed:', response?.msg);
+            console.log('❌ Join failed:', response?.msg);
             return;
           }
 
@@ -853,7 +890,6 @@ const getNextCellPosition = (
           fetchActivePlayers(boardId);
         },
       );
-      
     });
     socket.on('disconnect', reason => {
       // console.log('❌ Socket disconnected:', reason);
@@ -866,98 +902,95 @@ const getNextCellPosition = (
       // console.log('❌ socket error', err);
     });
     socket.onAny((event, ...args) => {
-        // console.log('📡 SOCKET EVENT =>', event);
+      // console.log('📡 SOCKET EVENT =>', event);
     });
     socket.on('activePlayerJoined', async (data: any) => {
+      console.log(
+        'ACTIVE PLAYER JOINED FULL =>',
+        JSON.stringify(data, null, 2),
+      );
+
+      console.log('DICE VALUES RECEIVED =>', data?.loggedInMrStats?.diceValues);
       console.log('🟣 activePlayerJoined', data);
 
       if (data?.boardId !== boardId) {
         return;
       }
       Toast.show({
-    type: 'success',
-    text1: 'Player Joined',
-    text2: `${data?.playerName || 'A player'} joined the board`,
-    position: 'top',
-    visibilityTime: 3000,
-  });
+        type: 'success',
+        text1: 'Player Joined',
+        text2: `${data?.playerName || 'A player'} joined the board`,
+        position: 'top',
+        visibilityTime: 3000,
+      });
 
-//       joinSound.stop(() => {
-//   joinSound.play();
-// });
+      //       joinSound.stop(() => {
+      //   joinSound.play();
+      // });
       fetchActivePlayers(boardId);
-      const diceValues =
-  data?.loggedInMrStats?.diceValues || [];
+      const diceValues = data?.loggedInMrStats?.diceValues || [];
 
-if (diceValues.length) {
-  setDiceRows(prev => {
-    const next = [...prev];
+      if (diceValues.length) {
+        setDiceRows(prev => {
+          const next = [...prev];
 
-    diceValues.forEach((d: any) => {
-      const row = {
-        playerId: String(data.flmId),
+          diceValues.forEach((d: any) => {
+            const row = {
+              playerId: String(data.flmId),
 
-        diceValue:
-          d.diceValue === null ||
-          d.diceValue === undefined
-            ? null
-            : Number(d.diceValue),
+              diceValue:
+                d.diceValue === null || d.diceValue === undefined
+                  ? null
+                  : Number(d.diceValue),
 
-        uploadId:
-          d.id === null || d.id === undefined ? null : String(d.id),
+              uploadId:
+                d.id === null || d.id === undefined ? null : String(d.id),
 
-        rolledAt:
-          d.dateOfUpload || null,
-      };
+              rolledAt: d.dateOfUpload || null,
+            };
 
-      const existingIndex = next.findIndex(
-        r =>
-          String(r.uploadId) ===
-          String(row.uploadId),
-      );
+            const existingIndex = next.findIndex(
+              r => String(r.uploadId) === String(row.uploadId),
+            );
 
-      if (existingIndex >= 0) {
-        next[existingIndex] = row;
-      } else {
-        next.push(row);
+            if (existingIndex >= 0) {
+              next[existingIndex] = row;
+            } else {
+              next.push(row);
+            }
+          });
+
+          return next;
+        });
       }
     });
-
-    return next;
-  });
-}
-    });
     socket.on('playerJoined', (data: any) => {
-
       if (data?.boardId !== boardId) {
         return;
       }
-//       joinSound.stop(() => {
-//   joinSound.play();
-// });
+      //       joinSound.stop(() => {
+      //   joinSound.play();
+      // });
       fetchActivePlayers(boardId);
     });
     socket.on('activePlayerLeft', async (data: any) => {
-
       if (data?.boardId !== boardId) {
         return;
       }
       Toast.show({
-  type: 'error',
-  text1: 'Player Left',
-  text2: `${data?.playerName || 'A player'} left the board`,
-  position: 'top',
-  visibilityTime: 3000,
-});
+        type: 'error',
+        text1: 'Player Left',
+        text2: `${data?.playerName || 'A player'} left the board`,
+        position: 'top',
+        visibilityTime: 3000,
+      });
     });
     socket.on('roomUpdate', (data: any) => {
-
       if (data?.boardId !== boardId) {
         return;
       }
     });
     socket.on('diceRolled', (data: any) => {
-
       if (data?.boardId !== boardId) {
         return;
       }
@@ -968,6 +1001,11 @@ if (diceValues.length) {
         );
 
         setDiceRows(incomingDiceRows);
+
+        console.log(
+          'INITIAL DICE ROWS =>',
+          JSON.stringify(incomingDiceRows, null, 2),
+        );
       }
     });
     socket.on('newDiceValue', (data: any) => {
@@ -983,20 +1021,21 @@ if (diceValues.length) {
         ]);
       }
     });
-    socket.on('diceCleared', (data: any) => {
 
+    socket.on('diceCleared', (data: any) => {
       if (Array.isArray(data?.allPlayersDice)) {
         const incomingDiceRows = normalizeDiceRows(
           data.diceValue || data.allPlayersDice || [],
         );
+        //         console.log(
+        //   'MR DICE =>',
+        //   json.data.loggedInMrStats?.diceValues,
+        // );
 
         setDiceRows(incomingDiceRows);
-
-        
       }
     });
     socket.on('pawnMoved', async (delta: any) => {
-
       const d = delta?.data;
 
       if (!d || d.boardId !== boardId) {
@@ -1024,14 +1063,14 @@ if (diceValues.length) {
 
             if (index >= 0) {
               next[index] = {
-  ...next[index],
-  diceValue: updated.diceValue,
-  uploadId:
-    updated.id === null || updated.id === undefined
-      ? null
-      : String(updated.id),
-  rolledAt: updated.rolledAt,
-};
+                ...next[index],
+                diceValue: updated.diceValue,
+                uploadId:
+                  updated.id === null || updated.id === undefined
+                    ? null
+                    : String(updated.id),
+                rolledAt: updated.rolledAt,
+              };
             }
           });
 
@@ -1049,18 +1088,17 @@ if (diceValues.length) {
       }
       socketRef.current?.emit('joinGameAsActive', {
         boardId,
-        playerId: myFlmId,
+        playerId: myPlayerIdForDice,
         userId: user?.id,
       });
 
       socketRef.current?.emit('playerJoined', {
         boardId,
-        playerId: myFlmId,
+        playerId: myPlayerIdForDice,
         userId: user?.id,
       });
     });
     return () => {
-
       socket.removeAllListeners();
 
       socket.disconnect();
@@ -1079,18 +1117,36 @@ if (diceValues.length) {
     }
 
     setIsSelectingDice(true);
+
+    console.log('SELECT DICE =>', {
+      boardId,
+      playerId: myPlayerIdForDice,
+      bluePlayerId: bluePlayer?.playerId,
+      userId: user?.id,
+      diceValue,
+      uploadId,
+    });
+
+    console.log('SELECT DICE PAYLOAD =>', {
+      boardId,
+      playerId: myPlayerIdForDice,
+      userId: user?.mrId,
+      mrId: user?.mrId,
+      flmId: user?.flmId,
+    });
+
     socketRef.current.emit(
       'selectDice',
       {
         boardId,
-        playerId: myFlmId,
-        userId: user?.id,
+        playerId: myPlayerIdForDice,
+        userId: user?.mrId,
         selectedValue: diceValue,
         uploadId,
       },
       (response: any) => {
-
         setIsSelectingDice(false);
+        console.log('SELECT DICE RESPONSE =>', response);
 
         if (!response?.ok) {
           showAlert({
@@ -1105,10 +1161,40 @@ if (diceValues.length) {
         setCurrentDiceValue(diceValue);
 
         setSelectedUploadId(uploadId);
+        const myPawns = pawns.filter(
+          p => String(p.playerId) === String(myFlmId),
+        );
+
+        const movablePawns = myPawns.filter(p => {
+          // pawn already outside
+          if (p.type === 'main') {
+            return true;
+          }
+
+          // pawn in base can move only on 6
+          if (p.type === 'base' && diceValue === 6) {
+            return true;
+          }
+
+          return false;
+        });
+
+        console.log('MOVABLE PAWNS =>', movablePawns);
+
+        if (movablePawns.length === 1) {
+          setTimeout(() => {
+            handlePawnClick(movablePawns[0]);
+          }, 200);
+
+          return;
+        }
       },
     );
   };
-
+  console.log(
+    'MY PAWNS =>',
+    pawns.filter(p => String(p.playerId) === String(myFlmId)),
+  );
   const handlePawnClick = (pawn: Pawn) => {
     if (!socketRef.current || !boardId) {
       return;
@@ -1124,14 +1210,17 @@ if (diceValues.length) {
       return;
     }
     usedDiceUploadIdRef.current = selectedUploadId;
-
+    console.log(
+      'MY PAWNS =>',
+      pawns.filter(p => String(p.playerId) === String(myFlmId)),
+    );
     socketRef.current.emit(
       'movePawn',
       {
         boardId,
         pawnId: pawn.id,
-        playerId: myFlmId,
-        userId: user?.id,
+        playerId: myPlayerIdForDice,
+        userId: user?.mrId,
         diceValue: currentDiceValue,
         uploadId: selectedUploadId,
       },
@@ -1204,19 +1293,17 @@ if (diceValues.length) {
 
       posMap.get(key)!.push(pawn);
     });
-    
+
     const elements: JSX.Element[] = [];
 
     posMap.forEach((group, key) => {
       const [col, row] = key.split(',').map(Number);
 
       const pixel = gridToPixel(col, row);
-      
+
       group.forEach((pawn, i) => {
         const offset =
-          group.length > 1
-            ? (i - (group.length - 1) / 2) * s(5)
-            : 0;
+          group.length > 1 ? (i - (group.length - 1) / 2) * s(5) : 0;
 
         elements.push(
           <TouchableOpacity
@@ -1233,11 +1320,7 @@ if (diceValues.length) {
           >
             <View style={styles.pawnBackplate}>
               <Image
-                source={
-                  PAWN_IMAGES[
-                    getPerspectiveColor(pawn.color)
-                  ]
-                }
+                source={PAWN_IMAGES[getPerspectiveColor(pawn.color)]}
                 style={styles.boardPawnImage}
               />
             </View>
@@ -1245,7 +1328,7 @@ if (diceValues.length) {
         );
       });
     });
-    
+
     return elements;
   };
 
@@ -1257,11 +1340,11 @@ if (diceValues.length) {
       .forEach(p => {
         const perspectiveColor = getPerspectiveColor(p.color);
 
-if (!basePawnsByColor[perspectiveColor]) {
-  basePawnsByColor[perspectiveColor] = [];
-}
+        if (!basePawnsByColor[perspectiveColor]) {
+          basePawnsByColor[perspectiveColor] = [];
+        }
 
-basePawnsByColor[perspectiveColor].push(p);
+        basePawnsByColor[perspectiveColor].push(p);
       });
     Object.entries(basePawnsByColor).forEach(([color, colorPawns]) => {
       const positions = BASE_POSITIONS[color] || [];
@@ -1271,7 +1354,7 @@ basePawnsByColor[perspectiveColor].push(p);
         const pixel = gridToPixel(pos[0], pos[1]);
         elements.push(
           <TouchableOpacity
-           key={`${pawn.id}-${pawn.currentPosition}`}
+            key={`${pawn.id}-${pawn.currentPosition}`}
             activeOpacity={0.8}
             onPress={() => handlePawnClick(pawn)}
             style={[
@@ -1309,9 +1392,8 @@ basePawnsByColor[perspectiveColor].push(p);
       const activePlayer = activePlayers.find(a => a.flmId === player.playerId);
 
       if (activePlayer) {
-        colorToName[
-  getPerspectiveColor(player.color)
-] = activePlayer.playerName;
+        colorToName[getPerspectiveColor(player.color)] =
+          activePlayer.playerName;
       }
     });
 
@@ -1365,35 +1447,33 @@ basePawnsByColor[perspectiveColor].push(p);
         </View>,
       );
     }
-
+    const playerId =
+      user?.MrID || user?.mrId || user?.flmId || user?.slmId || user?.tlmId;
     // Blue player - bottom left (WITH JOIN LOGIC)
     const handleJoinBlue = async () => {
       if (isFlm) {
-  Toast.show({
-    type: 'error',
-    text2: 'Only MR can join the board',
-    position: 'top',
-    visibilityTime: 3000,
-  });
+        Toast.show({
+          type: 'error',
+          text2: 'Only MR can join the board',
+          position: 'top',
+          visibilityTime: 3000,
+        });
 
-  return;
-}
+        return;
+      }
       try {
-        const checkRes = await fetch(
-          `${API_BASE_URL}/api/active-player/check`,
-          {
-            method: 'POST',
-            headers: {
-              ...authHeaders(session?.token),
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              boardId,
-              playerId: user?.id,
-              flmId: myFlmId,
-            }),
+        const checkRes = await fetch(`${baseUrl}/api/active-player/check`, {
+          method: 'POST',
+          headers: {
+            ...authHeaders(session?.token),
+            'Content-Type': 'application/json',
           },
-        );
+          body: JSON.stringify({
+            boardId,
+            playerId: playerId,
+            flmId: myFlmId,
+          }),
+        });
 
         const checkJson = await checkRes.json();
 
@@ -1424,7 +1504,7 @@ basePawnsByColor[perspectiveColor].push(p);
               onPress: withClose(async () => {
                 try {
                   const response = await fetch(
-                    `${API_BASE_URL}/api/active-player/set`,
+                    `${baseUrl}/api/active-player/set`,
                     {
                       method: 'POST',
                       headers: {
@@ -1433,7 +1513,7 @@ basePawnsByColor[perspectiveColor].push(p);
                       },
                       body: JSON.stringify({
                         boardId,
-                        playerId: user?.id,
+                        playerId: playerId,
                         playerRole: user?.role,
                         flmId: myFlmId,
                       }),
@@ -1441,15 +1521,14 @@ basePawnsByColor[perspectiveColor].push(p);
                   );
 
                   const json = await response.json();
-
+                  console.log('Join response =>', json);
                   // console.log('JOIN RESPONSE', json);
 
                   if (json?.success || json?.ok) {
                     await fetchBoardState(boardId!);
                     socketRef.current?.emit('joinGame', {
                       boardId,
-                      playerId: myFlmId,
-                      userId: user?.id,
+                      playerId: playerId,
                     });
 
                     // console.log('🔄 REJOIN SENT');
@@ -1457,16 +1536,14 @@ basePawnsByColor[perspectiveColor].push(p);
                     setTimeout(() => {
                       socketRef.current?.emit('joinGameAsActive', {
                         boardId,
-                        playerId: myFlmId,
-                        userId: user?.id,
+                        playerId: playerId,
                       });
 
                       // console.log('✅ joinGameAsActive emitted AFTER REJOIN');
                     }, 700);
                     socketRef.current?.emit('playerJoined', {
                       boardId,
-                      playerId: myFlmId,
-                      userId: user?.id,
+                      playerId: playerId,
                     });
                   }
                 } catch (error) {
@@ -1540,11 +1617,9 @@ basePawnsByColor[perspectiveColor].push(p);
       </View>
     );
   }
- const getPlayerByColor = (perspectiveColor: PawnColor) => {
-  return players.find(
-    p => getPerspectiveColor(p.color) === perspectiveColor,
-  );
-};
+  const getPlayerByColor = (perspectiveColor: PawnColor) => {
+    return players.find(p => getPerspectiveColor(p.color) === perspectiveColor);
+  };
 
   const renderTeamCard = (
     player: Player | undefined,
@@ -1552,20 +1627,18 @@ basePawnsByColor[perspectiveColor].push(p);
     reverse?: boolean,
   ) => {
     if (!player) return null;
-// const perspectiveColor = getPerspectiveColor(player.color);
+    // const perspectiveColor = getPerspectiveColor(player.color);
     const diceRow =
-  [...diceRows]
-    .reverse()
-    .find(
-      (r: DiceByPlayerRow) =>
-        String(r.playerId) === String(player.playerId) &&
-        r.diceValue != null,
-    ) || null;
+      [...diceRows]
+        .reverse()
+        .find(
+          (r: DiceByPlayerRow) =>
+            String(r.playerId) === String(player.playerId) &&
+            r.diceValue != null,
+        ) || null;
 
- const diceValue =
-  diceRow?.diceValue == null
-    ? null
-    : Number(diceRow.diceValue);
+    const diceValue =
+      diceRow?.diceValue == null ? null : Number(diceRow.diceValue);
 
     // Default dice face when no dice is available yet
     const diceValueForUI = diceValue == null ? 1 : diceValue;
@@ -1574,14 +1647,9 @@ basePawnsByColor[perspectiveColor].push(p);
     const lastMovedAt = player.lastMovedAt ?? null;
 
     return (
-      <View
-  style={[
-    styles.diceboard,
-    positionStyle,
-  ]}
->
+      <View style={[styles.diceboard, positionStyle]}>
         {reverse && (
-            <View
+          <View
             style={{
               right: s(8),
               alignSelf: 'center',
@@ -1605,17 +1673,17 @@ basePawnsByColor[perspectiveColor].push(p);
             </Text>
             {DICE_IMAGE_BY_VALUE[diceValueForUI] ? (
               (() => {
-  return (
-    <Image
-      source={DICE_IMAGE_BY_VALUE[diceValueForUI]}
-      style={{
-        width: s(28),
-        height: s(28),
-        resizeMode: 'contain',
-      }}
-    />
-  );
-})()
+                return (
+                  <Image
+                    source={DICE_IMAGE_BY_VALUE[diceValueForUI]}
+                    style={{
+                      width: s(28),
+                      height: s(28),
+                      resizeMode: 'contain',
+                    }}
+                  />
+                );
+              })()
             ) : (
               <Text style={styles.fallbackDiceText}>No Dice</Text>
             )}
@@ -1658,16 +1726,16 @@ basePawnsByColor[perspectiveColor].push(p);
               (() => {
                 // const DiceComponent = DICE_IMAGE_BY_VALUE[diceValueForUI];
 
-               return (
-  <Image
-    source={DICE_IMAGE_BY_VALUE[diceValueForUI]}
-    style={{
-      width: s(28),
-      height: s(28),
-      resizeMode: 'contain',
-    }}
-  />
-);
+                return (
+                  <Image
+                    source={DICE_IMAGE_BY_VALUE[diceValueForUI]}
+                    style={{
+                      width: s(28),
+                      height: s(28),
+                      resizeMode: 'contain',
+                    }}
+                  />
+                );
               })()
             ) : (
               <Text style={styles.fallbackDiceText}>No Dice</Text>
@@ -1688,39 +1756,49 @@ basePawnsByColor[perspectiveColor].push(p);
       </View>
     );
   };
-  const redPlayer = getPlayerByColor('red');
-const greenPlayer = getPlayerByColor('green');
-const yellowPlayer = getPlayerByColor('yellow');
-const bluePlayerData = getPlayerByColor('blue');
 
-const blueActivePlayer = activePlayers.find(
-  p => String(p.flmId) === String(bluePlayerData?.playerId),
-);
+  const redPlayer = getPlayerByColor('red');
+  const greenPlayer = getPlayerByColor('green');
+  const yellowPlayer = getPlayerByColor('yellow');
+  const bluePlayerData = getPlayerByColor('blue');
+
+  const blueActivePlayer = activePlayers.find(
+    p => String(p.flmId) === String(bluePlayerData?.playerId),
+  );
 
   const bluePlayerExists = !!blueActivePlayer;
 
-  const bluePlayer = bluePlayerExists ? bluePlayerData : null;
-const perspectiveDiceRow =
-  [...diceRows]
-    .reverse()
-    .find(
-      r =>
-        String(r.playerId) === String(myFlmId) &&
-        r.diceValue != null,
-    ) || null;
-// const perspectiveDiceValue =
-//   perspectiveDiceRow?.diceValue == null
-//     ? null
-//     : Number(perspectiveDiceRow.diceValue);
-// // console.log('🎲 diceRows =>', diceRows);
-// // console.log('🎲 perspectiveDiceRow =>', perspectiveDiceRow);
-// // console.log('🎲 perspectiveDiceValue =>', perspectiveDiceValue);
+ const bluePlayer =
+  isFlm
+    ? bluePlayerData
+    : blueActivePlayer
+      ? bluePlayerData
+      : null;
 
-// const perspectiveUploadId =
-//   perspectiveDiceRow?.uploadId ?? null;
-//   // console.log('BLUE PLAYER =>', bluePlayer);
-//   // console.log('TEAM NAME =>', bluePlayer?.teamName);
-//   // console.log('TEAM LOGO =>', getTeamLogo(bluePlayer?.teamName));
+  console.log('BLUE PLAYER DATA =>', bluePlayerData);
+console.log('ACTIVE PLAYERS =>', activePlayers);
+console.log('BLUE ACTIVE PLAYER =>', blueActivePlayer);
+  const perspectiveDiceRow =
+    [...diceRows]
+      .reverse()
+      .find(
+        r =>
+          String(r.playerId) === String(myPlayerIdForDice) &&
+          r.diceValue != null,
+      ) || null;
+  // const perspectiveDiceValue =
+  //   perspectiveDiceRow?.diceValue == null
+  //     ? null
+  //     : Number(perspectiveDiceRow.diceValue);
+  // // console.log('🎲 diceRows =>', diceRows);
+  // // console.log('🎲 perspectiveDiceRow =>', perspectiveDiceRow);
+  // // console.log('🎲 perspectiveDiceValue =>', perspectiveDiceValue);
+
+  // const perspectiveUploadId =
+  //   perspectiveDiceRow?.uploadId ?? null;
+  //   // console.log('BLUE PLAYER =>', bluePlayer);
+  //   // console.log('TEAM NAME =>', bluePlayer?.teamName);
+  //   // console.log('TEAM LOGO =>', getTeamLogo(bluePlayer?.teamName));
   return (
     <SafeAreaView style={styles.container}>
       <View>
@@ -1731,20 +1809,20 @@ const perspectiveDiceRow =
               key={player.playerId}
               style={[
                 styles.teamCard,
-                player.playerId === myFlmId && styles.teamCardActive,
+                player.playerId === myPlayerIdForDice && styles.teamCardActive,
               ]}
             >
               <View style={styles.numberBadge}>
                 <Text style={styles.numberText}>
-  {player.rank ?? index + 1}
-</Text>
+                  {player.rank ?? index + 1}
+                </Text>
               </View>
               <Text style={styles.teamName} numberOfLines={2}>
-                                    {(player.teamName || player.playerName).replace(
-                                      /([a-z])([A-Z])/g,
-                                      '$1\n$2',
-                                    )}
-                                  </Text>
+                {(player.teamName || player.playerName).replace(
+                  /([a-z])([A-Z])/g,
+                  '$1\n$2',
+                )}
+              </Text>
               <View style={styles.statsRow}>
                 <View style={styles.statItem}>
                   <Image
@@ -1761,7 +1839,7 @@ const perspectiveDiceRow =
                   <Text style={styles.statText}>{player.moves}</Text>
                 </View>
               </View>
-              {player.playerId === myFlmId && (
+              {player.playerId === myPlayerIdForDice && (
                 <View style={styles.badgeLabel}>
                   <Text style={styles.badgeText}>YOU</Text>
                 </View>
@@ -1828,17 +1906,13 @@ const perspectiveDiceRow =
       </View>
 
       <TouchableOpacity
-  style={styles.fab}
-  onPress={() => {
-    setShowChat(true);
-  }}
->
-  <Icon
-    name="forum"
-    size={s(24)}
-    color="#fffdfd"
-  />
-</TouchableOpacity>
+        style={styles.fab}
+        onPress={() => {
+          setShowChat(true);
+        }}
+      >
+        <Icon name="forum" size={s(24)} color="#fffdfd" />
+      </TouchableOpacity>
       <View
         style={{
           position: 'relative',
@@ -1918,35 +1992,33 @@ const perspectiveDiceRow =
                 </Text>
               </View>
               <View
-  style={{
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: s(4),
-  }}
->
-  <Text
-    style={{
-      fontSize: s(11),
-      color: '#444',
-      fontWeight: '600',
-    }}
-  >
-    {bluePlayer?.lastMovedAt
-      ? new Date(
-          bluePlayer.lastMovedAt,
-        ).toLocaleDateString(
-          'en-GB',
-          {
-            day: '2-digit',
-            month: 'short',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-          },
-        )
-      : '—'}
-  </Text>
-</View>
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginTop: s(4),
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: s(11),
+                    color: '#444',
+                    fontWeight: '600',
+                  }}
+                >
+                  {bluePlayer?.lastMovedAt
+                    ? new Date(bluePlayer.lastMovedAt).toLocaleDateString(
+                        'en-GB',
+                        {
+                          day: '2-digit',
+                          month: 'short',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit',
+                        },
+                      )
+                    : '—'}
+                </Text>
+              </View>
             </>
           ) : (
             <View
@@ -1977,138 +2049,138 @@ const perspectiveDiceRow =
             </View>
           )}
         </View>
-{/* RIGHT: big active dice (tap) + small dice */}
-{(() => {
-  if (!bluePlayer) {
-    return (
-      <Text
-        style={{
-          top: s(26),
-          fontSize: s(13),
-          color: '#444',
-          fontWeight: '700',
-        }}
-      >
-        No Dice
-      </Text>
-    );
-  }
+        {/* RIGHT: big active dice (tap) + small dice */}
+        {(() => {
+          if (!bluePlayer) {
+            return (
+              <Text
+                style={{
+                  top: s(26),
+                  fontSize: s(13),
+                  color: '#444',
+                  fontWeight: '700',
+                }}
+              >
+                No Dice
+              </Text>
+            );
+          }
 
-  const allMyDice = [...diceRows]
-    .filter(
-      r =>
-        String(r.playerId) === String(myFlmId) &&
-        r.diceValue != null,
-    )
-    .sort((a, b) => {
-      const at = a.rolledAt
-        ? new Date(a.rolledAt).getTime()
-        : 0;
-
-      const bt = b.rolledAt
-        ? new Date(b.rolledAt).getTime()
-        : 0;
-
-      return at - bt;
-    });
-
-  const activeDiceRow = allMyDice[0] || null;
-
-  const active =
-    activeDiceRow?.diceValue == null
-      ? null
-      : Number(activeDiceRow.diceValue);
-
-  const activeUploadId =
-    activeDiceRow?.uploadId || '';
-
-  const smallDice = allMyDice
-    .slice(1, 3)
-    .map(d =>
-      d.diceValue == null
-        ? null
-        : Number(d.diceValue),
-    )
-    .filter(v => v != null);
-
-  if (
-    active == null ||
-    !DICE_IMAGE_BY_VALUE[active]
-  ) {
-    return (
-      <Text
-        style={{
-          top: s(26),
-          fontSize: s(13),
-          color: '#444',
-          fontWeight: '700',
-        }}
-      >
-        No Dice
-      </Text>
-    );
-  }
-
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        justifyContent: 'flex-end',
-        flex: 1,
-        gap: s(8),
-        paddingTop: s(4),
-      }}
-    >
-      {/* SMALL DICE */}
-      {smallDice.length > 0 && (
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'flex-start',
-            gap: s(5),
-            marginTop: s(2),
-          }}
-        >
-          {smallDice.map((v, idx) => {
-           return (
-  <Image
-    key={`${v}-${idx}`}
-    source={DICE_IMAGE_BY_VALUE[v as number]}
-    style={{
-      width: 24,
-      height: 24,
-      resizeMode: 'contain',
-    }}
-  />
-);
-          })}
-        </View>
-      )}
-
-      {/* BIG DICE */}
-      <TouchableOpacity
-        activeOpacity={0.8}
-        onPress={() => {
-          handleDiceSelection(
-            active,
-            activeUploadId,
+          console.log('ACTUAL PLAYER ID =>', myPlayerIdForDice);
+          console.log('DICE ROWS =>', diceRows);
+          console.log(
+            'DICE ROW IDS =>',
+            diceRows.map(d => d.playerId),
           );
-        }}
-      >
-        <Image
-  source={DICE_IMAGE_BY_VALUE[active]}
-  style={{
-    width: currentDiceValue ? 54 : 46,
-    height: currentDiceValue ? 54 : 46,
-    resizeMode: 'contain',
-  }}
-/>
-      </TouchableOpacity>
-    </View>
-  );
-})()}
-        </View>
+
+          console.log('SEARCHING FOR =>', myPlayerIdForDice);
+          const allMyDice = [...diceRows]
+
+            // .filter(
+            //   r =>
+            //     String(r.playerId) === String(myPlayerIdForDice) &&
+            //     r.diceValue != null,
+            // )
+
+            .filter(
+              r =>
+                String(r.playerId) === String(bluePlayer?.playerId) &&
+                r.diceValue != null,
+            )
+            .sort((a, b) => {
+              const at = a.rolledAt ? new Date(a.rolledAt).getTime() : 0;
+
+              const bt = b.rolledAt ? new Date(b.rolledAt).getTime() : 0;
+
+              return at - bt;
+            });
+
+          const activeDiceRow = allMyDice[0] || null;
+
+          const active =
+            activeDiceRow?.diceValue == null
+              ? null
+              : Number(activeDiceRow.diceValue);
+
+          const activeUploadId = activeDiceRow?.uploadId || '';
+
+          const smallDice = allMyDice
+            .slice(1, 3)
+            .map(d => (d.diceValue == null ? null : Number(d.diceValue)))
+            .filter(v => v != null);
+
+          if (active == null || !DICE_IMAGE_BY_VALUE[active]) {
+            return (
+              <Text
+                style={{
+                  top: s(26),
+                  fontSize: s(13),
+                  color: '#444',
+                  fontWeight: '700',
+                }}
+              >
+                No Dice
+              </Text>
+            );
+          }
+
+          return (
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'flex-start',
+                justifyContent: 'flex-end',
+                flex: 1,
+                gap: s(8),
+                paddingTop: s(4),
+              }}
+            >
+              {/* SMALL DICE */}
+              {smallDice.length > 0 && (
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'flex-start',
+                    gap: s(5),
+                    marginTop: s(2),
+                  }}
+                >
+                  {smallDice.map((v, idx) => {
+                    return (
+                      <Image
+                        key={`${v}-${idx}`}
+                        source={DICE_IMAGE_BY_VALUE[v as number]}
+                        style={{
+                          width: 24,
+                          height: 24,
+                          resizeMode: 'contain',
+                        }}
+                      />
+                    );
+                  })}
+                </View>
+              )}
+
+              {/* BIG DICE */}
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => {
+                  handleDiceSelection(active, activeUploadId);
+                }}
+              >
+                <Image
+                  source={DICE_IMAGE_BY_VALUE[active]}
+                  style={{
+                    width: currentDiceValue ? 54 : 46,
+                    height: currentDiceValue ? 54 : 46,
+                    resizeMode: 'contain',
+                  }}
+                />
+              </TouchableOpacity>
+            </View>
+          );
+        })()}
+      </View>
       <View
         style={{
           position: 'relative',
@@ -2146,7 +2218,7 @@ const perspectiveDiceRow =
         visible={showChat}
         onClose={() => setShowChat(false)}
         boardId={boardId}
-        playerId={myFlmId || ''}
+        playerId={myPlayerIdForDice || ''}
         playerName={user?.name || 'Player'}
         teamName={bluePlayer?.teamName || ''}
         userId={user?.id}
@@ -2319,10 +2391,9 @@ const styles = StyleSheet.create({
     fontSize: s(16),
   },
 
-  badgeLabel:
-   {
-    right:s(74),
-    bottom:s(70),
+  badgeLabel: {
+    right: s(74),
+    bottom: s(70),
     backgroundColor: '#245abd',
     paddingHorizontal: s(6),
     paddingVertical: s(2),

@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import { io, Socket } from 'socket.io-client';
-import { API_BASE_URL, authHeaders } from '../api';
+import { authHeaders } from '../api';
 import { useAuth } from '../auth/AuthContext';
 
 const { width: W } = Dimensions.get('window');
@@ -288,6 +288,7 @@ const getWeeksForMonth = (month: string | null) => {
 };
 const LeaderboardScreen: React.FC = () => {
   const { session, user } = useAuth();
+  const baseUrl = session?.backendUrl;
   const [activeTab, setActiveTab] = useState<RankTab>('Team Rank');
   const [activeMonth, setActiveMonth] = useState<string | null>(null);
   const [selectedWeek, setSelectedWeek] = useState<{
@@ -394,7 +395,7 @@ const LeaderboardScreen: React.FC = () => {
       params.set('endDate', range.endDate);
     }
 
-    return `${API_BASE_URL}${endpoint}?${params.toString()}`;
+    return `${baseUrl}${endpoint}?${params.toString()}`;
     }, [
   activeMonth,
   selectedWeek,
@@ -464,7 +465,7 @@ const LeaderboardScreen: React.FC = () => {
   }, [loadLeaderboard]);
 
   useEffect(() => {
-    const socket: Socket = io(API_BASE_URL, {
+    const socket: Socket = io(baseUrl, {
       transports: ['websocket'],
       reconnection: true,
       reconnectionAttempts: 10,

@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { io, Socket } from 'socket.io-client';
-import { API_BASE_URL, authHeaders } from '../api';
+import { authHeaders } from '../api';
 import { useAuth } from '../auth/AuthContext';
 
 const { width: W } = Dimensions.get('window');
@@ -101,6 +101,7 @@ const formatNotificationTime = (value: string) => {
 
 export default function Notification() {
   const { session, user } = useAuth();
+  const baseUrl = session?.backendUrl || '';
   const [selectedFilter, setSelectedFilter] = useState('Today');
   const [showFilters, setShowFilters] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -134,15 +135,35 @@ export default function Notification() {
         setErrorMessage('');
 
         const response = await fetch(
-          `${API_BASE_URL}/api/notifications?boardId=${encodeURIComponent(
+          `${baseUrl}/api/notifications?boardId=${encodeURIComponent(
             String(boardId),
           )}`,
           {
             headers: authHeaders(session?.token),
           },
         );
-        const json: NotificationsResponse = await response.json();
+        // const json: NotificationsResponse = await response.json();
+const text = await response.text();
 
+console.log(
+  'NOTIFICATION RAW RESPONSE =>',
+  text,
+);
+
+let json: NotificationsResponse;
+
+try {
+
+  json = JSON.parse(text);
+
+} catch (e) {
+
+  console.log(
+    'NOTIFICATION JSON FAILED',
+  );
+
+  return;
+}
         if (!response.ok || !json.ok) {
           setErrorMessage(json.msg || 'Unable to load notifications.');
           setNotifications([]);
@@ -176,7 +197,7 @@ export default function Notification() {
     );
 
     try {
-      await fetch(`${API_BASE_URL}/api/notifications/${notification.id}/read`, {
+      await fetch(`${baseUrl}/api/notifications/${notification.id}/read`, {
         method: 'PATCH',
         headers: authHeaders(session?.token),
       });
@@ -190,11 +211,16 @@ export default function Notification() {
   }, [loadNotifications]);
 
   useEffect(() => {
+     console.log('NOTIFICATION BASE URL =>', baseUrl);
+
+  console.log('NOTIFICATION BOARD ID =>', boardId);
+
+  console.log('NOTIFICATION TOKEN =>', session?.token);
     if (!boardId) {
       return;
     }
 
-    const socket: Socket = io(API_BASE_URL, {
+    const socket: Socket = io(baseUrl, {
       transports: ['websocket'],
       reconnection: true,
       reconnectionAttempts: 10,
@@ -204,7 +230,14 @@ export default function Notification() {
       socket.emit('joinRoom', { boardId, isSpectator: true });
     });
 
-    socket.on('newNotification', (notification: NotificationItem) => {
+   socket.on(
+  'newNotification',
+  (notification: NotificationItem) => {
+
+    console.log(
+      'NEW SOCKET NOTIFICATION =>',
+      notification,
+    );
       setNotifications(current => {
         if (current.some(item => item.id === notification.id)) {
           return current;
