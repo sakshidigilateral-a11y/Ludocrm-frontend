@@ -462,7 +462,7 @@ export default function RunScreen() {
   const { session, user } = useAuth();
   const baseUrl = session?.backendUrl || '';
   const isFlm = user?.role?.toLowerCase() === 'flm';
-  const myFlmId = isFlm ? user?.id : user?.flmId;
+  const myFlmId = user?.flmId;
   const [boardId, setBoardId] = useState<number | null>(null);
   const [pawns, setPawns] = useState<Pawn[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
@@ -513,12 +513,9 @@ export default function RunScreen() {
     if (!bid) return;
 
     try {
-      const res = await fetch(
-        `${baseUrl}/api/notifications?boardId=${bid}`,
-        {
-          headers: authHeaders(session?.token),
-        },
-      );
+      const res = await fetch(`${baseUrl}/api/notifications?boardId=${bid}`, {
+        headers: authHeaders(session?.token),
+      });
 
       const json = await res.json();
       console.log('res data', json);
@@ -532,18 +529,23 @@ export default function RunScreen() {
   const fetchBoard = useCallback(async () => {
     if (!myFlmId) return;
     try {
-      const res = await fetch(
+      console.log('USER =>', user);
+      console.log('myFlmId =>', myFlmId);
+      console.log(
+        'ACTIVE URL =>',
         `${baseUrl}/api/flm/${myFlmId}/boards/active`,
-        {
-          headers: authHeaders(session?.token),
-        },
       );
+      const res = await fetch(`${baseUrl}/api/flm/${myFlmId}/boards/active`, {
+        headers: authHeaders(session?.token),
+      });
       const json = await res.json();
+      console.log('fetchBoard response =>', json);
 
       const board = json.data?.find((b: any) => b.status === 'active');
-
+      console.log('ACTIVE BOARD =>', board);
       if (board?.id) {
         setBoardId(board.id);
+        console.log('SETTING BOARD ID =>', board.id);
         await fetchBoardState(board.id);
         await fetchBoardStatus();
         await fetchNotifications(board.id);

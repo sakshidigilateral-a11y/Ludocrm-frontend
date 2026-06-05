@@ -25,7 +25,7 @@ const teamLogos: Record<string, any> = {
   'Bangalore Indians': require('../assets/teamLogo/BangaloreIndians.png'),
   'Bhopal Titans': require('../assets/teamLogo/BhopalTitans.png'),
   'Chennai Superstars': require('../assets/teamLogo/ChennaiSuperstars.png'),
-  'Cuttack Gladiators': require('../assets/teamLogo/CuttackGladiators.png'),
+  CuttackGladiators: require('../assets/teamLogo/CuttackGladiators.png'),
   'Delhi Fighters': require('../assets/teamLogo/DelhiFighters.png'),
   'Gujarat Commandos': require('../assets/teamLogo/GujaratCommandos.png'),
   'Guwahati Champions': require('../assets/teamLogo/GuwahatiChampions.png'),
@@ -194,6 +194,8 @@ const convertBoardToMatch = (
   };
 };
 
+
+
 const fallbackByTab: Record<string, DashboardMatch[]> = {
   Live: [],
   Previous: [],
@@ -203,7 +205,7 @@ const fallbackByTab: Record<string, DashboardMatch[]> = {
 const ProfilePage = () => {
   const navigation = useNavigation<any>();
   const { session, user } = useAuth();
-  const baseUrl = session?.backendUrl || '';
+const baseUrl = session?.backendUrl || '';
   const [activeTab, setActiveTab] = useState('Live');
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -211,6 +213,7 @@ const ProfilePage = () => {
     coins: 0,
     moves: 0,
   });
+  
   const [recentMatches, setRecentMatches] = useState<
     Array<{ isWin: boolean; isDraw: boolean; mrScore: number }>
   >([]);
@@ -298,45 +301,64 @@ const ProfilePage = () => {
     try {
       const role = playerRole;
 
+      console.log('PLAYER ID =>', playerId);
+      console.log('ROLE =>', playerRole);
+      console.log('BASE URL =>', baseUrl);
+      console.log('USER =>', user);
+
       const rolePath = role.toLowerCase();
 
-      const [detailsResponse, imageResponse] = await Promise.all([
-        fetch(`${baseUrl}/api/${rolePath}/details`, {
-          method: 'POST',
-          headers: authHeaders(session?.token),
-          body: JSON.stringify(
-            role === 'MR'
-              ? {
-                  mrId: playerId,
-                }
-              : role === 'FLM'
-              ? {
-                  flmId: playerId,
-                }
-              : role === 'SLM'
-              ? {
-                  slmId: playerId,
-                }
-              : {
-                  tlmId: playerId,
-                },
-          ),
-        }),
-        fetch(`${baseUrl}/api/profile/get?playerId=${playerId}&role=${role}`),
-      ]);
+      // const [detailsResponse, imageResponse] = await Promise.all([
+      //   fetch(`${baseUrl}/api/${rolePath}/details`, {
+      //     method: 'POST',
+      //     headers: authHeaders(session?.token),
+      //     body: JSON.stringify(
+      //       role === 'MR'
+      //         ? {
+      //             mrId: playerId,
+      //           }
+      //         : role === 'FLM'
+      //         ? {
+      //             flmId: playerId,
+      //           }
+      //         : role === 'SLM'
+      //         ? {
+      //             slmId: playerId,
+      //           }
+      //         : {
+      //             tlmId: playerId,
+      //           },
+      //     ),
+      //   }),
+      //   fetch(`${baseUrl}/api/profile/get?playerId=${playerId}&role=${role}`),
+      // ]);
+
+      const detailsResponse = await fetch(
+  `${baseUrl}/api/${rolePath}/details`,
+  {
+    method: 'POST',
+    headers: authHeaders(session?.token),
+   body: JSON.stringify(
+  playerRole === 'MR'
+    ? { mrId: playerId }
+    : playerRole === 'FLM'
+    ? { flmId: playerId }
+    : playerRole === 'SLM'
+    ? { slmId: playerId }
+    : { tlmId: playerId },
+),
+  },
+);
 
       const json: MrDetailsResponse = await detailsResponse.json();
-      const imageJson = await imageResponse.json();
+   
 
       if (!json.success || !json.data) {
         return;
       }
 
       const data = json.data;
-      const profileImageUrl =
-        imageJson.success && imageJson.imageName
-          ? `${baseUrl}/profileImage/${imageJson.imageName}?t=${Date.now()}`
-          : null;
+      const profileImageUrl = data.profileImage || null;
 
       setProfile({
         username: data.mrName || data.flmName || user?.name || null,
@@ -355,10 +377,27 @@ const ProfilePage = () => {
         ),
         profileImage: profileImageUrl,
       });
+
+      console.log(
+  'PROFILE SET =>',
+  JSON.stringify({
+    username: data.mrName,
+    role: data.role,
+    playerId: data.mrId,
+    teamName: data.teamName,
+  }),
+);
+      // const text = await detailsResponse.text();
+
+      // console.log('PROFILE RESPONSE =>', text);
+
+      // console.log('PROFILE API RESPONSE =>', text);
+      return;
     } catch (error) {
       console.warn('Dashboard profile fetch failed:', error);
     }
   }, [
+    baseUrl,
     playerId,
     playerRole,
     session?.token,
@@ -377,14 +416,28 @@ const ProfilePage = () => {
         playerRole === 'MR' && user?.flmId
           ? `?flmId=${encodeURIComponent(user.flmId)}`
           : '';
-      const response = await fetch(
-        `${baseUrl}/api/flm/getLast5GamesStats/${encodeURIComponent(
-          playerId,
-        )}/${playerRole.toLowerCase()}${query}`,
-        {
-          headers: authHeaders(session?.token),
-        },
-      );
+ const payload =
+  playerRole === 'MR'
+    ? { mrId: playerId }
+    : playerRole === 'FLM'
+    ? { flmId: playerId }
+    : playerRole === 'SLM'
+    ? { slmId: playerId }
+    : { tlmId: playerId };
+const rolePath = playerRole.toLowerCase();
+// const detailsResponse = await fetch(
+//   `${baseUrl}/api/${rolePath}/details`,
+//   {
+//     method: 'POST',
+//     headers: authHeaders(session?.token),
+//     body: JSON.stringify(payload),
+//   },
+// );
+
+const response = await fetch(
+  `${baseUrl}/api/flm/getLast5GamesStats/${encodeURIComponent(playerId)}/${playerRole.toLowerCase()}${query}`,
+  { headers: authHeaders(session?.token) },
+);
       const json = await response.json();
 
       if (!json.success || !Array.isArray(json.data)) {
@@ -412,7 +465,9 @@ const ProfilePage = () => {
       if (!creatorId) {
         return;
       }
-
+      console.log('CREATOR ID =>', creatorId);
+      console.log('STATUS =>', boardStatusForTab(tab));
+      console.log('BASE URL =>', baseUrl);
       try {
         const response = await fetch(`${baseUrl}/api/flm/boards/status`, {
           method: 'POST',
@@ -423,11 +478,42 @@ const ProfilePage = () => {
           }),
         });
 
-        const json: BoardStatusResponse = await response.json();
+        const text = await response.text();
+
+         console.log(`=== BOARDS [${tab}] ===`);
+      console.log('HTTP STATUS =>', response.status);
+      console.log('RAW RESPONSE =>', text);
+      console.log('REQUEST BODY =>', JSON.stringify({ creatorId, status: boardStatusForTab(tab) }));
+      console.log('TOKEN =>', session?.token ? 'EXISTS' : 'MISSING');
+      console.log('BASE URL =>', baseUrl);
+
+        console.log('BOARD RESPONSE =>', text);
+
+        let json: BoardStatusResponse;
+
+        try {
+          json = JSON.parse(text);
+        } catch (e) {
+          console.log('BOARD JSON FAILED');
+          return;
+        }
         if (!json.success || !json.data) {
           return;
         }
+        console.log('BOARD RESPONSE FULL =>', JSON.stringify(json, null, 2));
+        console.log('CREATOR ID =>', creatorId);
+        console.log('STATUS =>', boardStatusForTab(tab));
 
+        const matches = (json.data || []).map(convertBoardToMatch);
+
+        console.log('TAB =>', tab, 'MATCH COUNT =>', matches.length);
+
+        console.log('FIRST MATCH =>', JSON.stringify(matches[0], null, 2));
+
+        setMatchesByTab(current => ({
+          ...current,
+          [tab]: matches,
+        }));
         setMatchesByTab(current => ({
           ...current,
           [tab]: (json.data || []).map(convertBoardToMatch),
@@ -436,7 +522,8 @@ const ProfilePage = () => {
         console.warn('Dashboard board fetch failed:', error);
       }
     },
-    [creatorId, session?.token],
+   [baseUrl, creatorId, session?.token],
+
   );
 
   const refreshVisibleBoards = useCallback(() => {
@@ -502,7 +589,22 @@ const ProfilePage = () => {
       socketRef.current = null;
     };
   }, [refreshVisibleBoards]);
+console.log('ACTIVE TAB =>', activeTab);
 
+console.log(
+  'LIVE LENGTH =>',
+  matchesByTab.Live.length,
+);
+
+console.log(
+  'PREVIOUS LENGTH =>',
+  matchesByTab.Previous.length,
+);
+
+console.log(
+  'UPCOMING LENGTH =>',
+  matchesByTab.Upcoming.length,
+);
   return (
     <View style={styles.container}>
       <Image

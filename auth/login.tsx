@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -11,16 +11,16 @@ import {
   StyleSheet,
   Image,
   useWindowDimensions,
-} from "react-native";
-import LinearGradient from "react-native-linear-gradient";
-import Icon from "react-native-vector-icons/MaterialIcons";
-import bgImg from "../assets/newAssets/Layer1copy.png";
+} from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
+import Icon from 'react-native-vector-icons/MaterialIcons';
+import bgImg from '../assets/newAssets/Layer1copy.png';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../App';
 import { authHeaders } from '../api';
 import { useAuth } from './AuthContext';
-import { mediatorLogin,  } from "../api/mediator";
+import { mediatorLogin } from '../api/mediator';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const clamp = (value: number, min: number, max: number) =>
@@ -32,7 +32,8 @@ const LoginScreen = () => {
   const [userId, setUserId] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { setSession } = useAuth();
   const [alertConfig, setAlertConfig] = useState({
     visible: false,
@@ -61,232 +62,235 @@ const LoginScreen = () => {
   const isLandscape = width > height;
 
   // Scaled dimensions
-  const fieldHeight = clamp(scale(50), isSmallScreen ? 44 : 46, isTablet ? 58 : 56);
+  const fieldHeight = clamp(
+    scale(50),
+    isSmallScreen ? 44 : 46,
+    isTablet ? 58 : 56,
+  );
   const fieldFontSize = clamp(scale(18), isSmallScreen ? 14 : 15, 18);
-  const cardPadding = clamp(scale(24), isSmallScreen ? 16 : 18, isTablet ? 32 : 28);
+  const cardPadding = clamp(
+    scale(24),
+    isSmallScreen ? 16 : 18,
+    isTablet ? 32 : 28,
+  );
   const fieldGap = clamp(scale(12), 10, isTablet ? 16 : 15);
   const borderRadius = clamp(scale(20), 14, 24);
 
   // Card width responsive
   const baseCardWidth = Math.min(width - 32, isTablet ? 500 : 430);
-  const cardWidth = isLandscape && height < 500 ? Math.min(width - 32, 550) : baseCardWidth;
+  const cardWidth =
+    isLandscape && height < 500 ? Math.min(width - 32, 550) : baseCardWidth;
 
-const handleLogin = async () => {
-  const trimmedUserId = userId.trim();
+  const handleLogin = async () => {
+    const trimmedUserId = userId.trim();
 
-  if (!trimmedUserId || !password) {
-    showAlert(
-      'Login Required',
-      'Please enter your user ID and password.',
-    );
-    return;
-  }
-
-  try {
-    setIsSubmitting(true);
-
-    // mediator api call
-    const json = await mediatorLogin(
-      trimmedUserId,
-      password,
-    );
-  console.log('Mediator login responseeeeeeeeeeeeee:', json);
-    // validation
-    if (!json.success) {
-      showAlert(
-        'Login Failed',
-        json.message || 'Invalid credentials.',
-      );
+    if (!trimmedUserId || !password) {
+      showAlert('Login Required', 'Please enter your user ID and password.');
       return;
     }
 
-    const loginData = json.data;
-     console.log('Parsed login data:', loginData);
-    // optional access check
-    // if (loginData.user.hasAccess !== 1) {
-    //   showAlert(
-    //     'Access Denied',
-    //     'Your account does not have access.',
-    //   );
-    //   return;
-    // }
+    try {
+      setIsSubmitting(true);
 
-    // store session
-// save locally
-await AsyncStorage.multiSet([
-  ['token', loginData.token],
-  ['backendUrl', loginData.backendUrl],
-  ['businessUnit', loginData.businessUnit],
-  ['user', JSON.stringify(loginData.user)],
-]);
+      // mediator api call
+      const json = await mediatorLogin(trimmedUserId, password);
+      console.log('Mediator login responseeeeeeeeeeeeee:', json);
+      // validation
+      if (!json.success) {
+        showAlert('Login Failed', json.message || 'Invalid credentials.');
+        return;
+      }
 
-console.log(
-  'BACKEND URL SAVED =>',
-  loginData.backendUrl,
-);
+      const loginData = json.data;
+      console.log('Parsed login data:', loginData);
+      // optional access check
+      // if (loginData.user.hasAccess !== 1) {
+      //   showAlert(
+      //     'Access Denied',
+      //     'Your account does not have access.',
+      //   );
+      //   return;
+      // }
 
-// store auth context
-setSession({
-  token: loginData.token,
-  user: loginData.user,
-  backendUrl: loginData.backendUrl,
-  businessUnit: loginData.businessUnit,
-  
-});
+      // store session
+      // save locally
+      await AsyncStorage.multiSet([
+        ['token', loginData.token],
+        ['backendUrl', loginData.backendUrl],
+        ['businessUnit', loginData.businessUnit],
+        ['user', JSON.stringify(loginData.user)],
+      ]);
 
-await AsyncStorage.setItem(
-  'backendUrl',
-  loginData.backendUrl,
-);
+      console.log('BACKEND URL SAVED =>', loginData.backendUrl);
 
-await AsyncStorage.setItem(
-  'token',
-  loginData.token,
-);
-// go dashboard
-navigation.reset({
-  index: 0,
-  routes: [{ name: 'dashboard' }],
-});
+      // store auth context
+      setSession({
+        token: loginData.token,
+        user: loginData.user,
+        backendUrl: loginData.backendUrl,
+        businessUnit: loginData.businessUnit,
+      });
 
-  } catch (error) {
-    showAlert(
-      'Login Failed',
-      error instanceof Error
-        ? error.message
-        : 'Unable to connect to server.',
-    );
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+      await AsyncStorage.setItem('backendUrl', loginData.backendUrl);
+
+      await AsyncStorage.setItem('token', loginData.token);
+      // go dashboard
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'dashboard' }],
+      });
+    } catch (error) {
+      showAlert(
+        'Login Failed',
+        error instanceof Error ? error.message : 'Unable to connect to server.',
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
-    <LinearGradient
-      colors={["#0B132B", "#1C2541"]}
-      style={styles.container}
-    >
+    <LinearGradient colors={['#0B132B', '#1C2541']} style={styles.container}>
       <View style={styles.bgImageContainer} pointerEvents="none">
-        <Image
-          source={bgImg}
-          style={styles.bgImage}
-        />
+        <Image source={bgImg} style={styles.bgImage} />
       </View>
-        <ScrollView
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={[
-            styles.scrollContent,
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.scrollContent,
+          {
+            minHeight: height,
+            paddingHorizontal: clamp(scale(16), 16, 28),
+            paddingVertical: isShortScreen ? scale(24) : scale(36),
+          },
+        ]}
+      >
+        <LinearGradient
+          colors={['#7F4BE2', '#9F6BFF']}
+          style={[
+            styles.card,
             {
-              minHeight: height,
-              paddingHorizontal: clamp(scale(16), 16, 28),
-              paddingVertical: isShortScreen ? scale(24) : scale(36),
+              width: cardWidth,
+              padding: cardPadding,
+              borderRadius: borderRadius,
+              gap: fieldGap,
             },
           ]}
         >
-          <LinearGradient
-            colors={["#7F4BE2", "#9F6BFF"]}
+          <TextInput
+            placeholder="MR ID / User ID"
+            placeholderTextColor="#ddd"
             style={[
-              styles.card,
+              styles.input,
               {
-                width: cardWidth,
-                padding: cardPadding,
-                borderRadius: borderRadius,
-                gap: fieldGap,
+                height: fieldHeight,
+                fontSize: fieldFontSize,
+                paddingHorizontal: clamp(
+                  scale(12),
+                  isSmallScreen ? 10 : 12,
+                  16,
+                ),
+              },
+            ]}
+            value={userId}
+            onChangeText={setUserId}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            returnKeyType="next"
+          />
+
+          <View
+            style={[
+              styles.passwordContainer,
+              {
+                height: fieldHeight,
+                paddingHorizontal: clamp(
+                  scale(12),
+                  isSmallScreen ? 10 : 12,
+                  16,
+                ),
               },
             ]}
           >
             <TextInput
-              placeholder="MR ID / User ID"
+              placeholder="Password"
               placeholderTextColor="#ddd"
-              style={[
-                styles.input,
-                {
-                  height: fieldHeight,
-                  fontSize: fieldFontSize,
-                  paddingHorizontal: clamp(scale(12), isSmallScreen ? 10 : 12, 16),
-                },
-              ]}
-              value={userId}
-              onChangeText={setUserId}
-              autoCapitalize="characters"
+              secureTextEntry={!passwordVisible}
+              style={[styles.passwordInput, { fontSize: fieldFontSize }]}
+              value={password}
+              onChangeText={setPassword}
+              autoCapitalize="none"
               autoCorrect={false}
-              returnKeyType="next"
+              returnKeyType="done"
+              onSubmitEditing={handleLogin}
             />
-
-            <View
-              style={[
-                styles.passwordContainer,
-                {
-                  height: fieldHeight,
-                  paddingHorizontal: clamp(scale(12), isSmallScreen ? 10 : 12, 16),
-                },
-              ]}
-            >
-              <TextInput
-                placeholder="Password"
-                placeholderTextColor="#ddd"
-                secureTextEntry={!passwordVisible}
-                style={[styles.passwordInput, { fontSize: fieldFontSize }]}
-                value={password}
-                onChangeText={setPassword}
-                autoCapitalize="none"
-                autoCorrect={false}
-                returnKeyType="done"
-                onSubmitEditing={handleLogin}
-              />
-              <TouchableOpacity
-                onPress={() => setPasswordVisible(!passwordVisible)}
-                hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
-              >
-                <Icon
-                  name={passwordVisible ? "visibility-off" : "visibility"}
-                  size={clamp(scale(20), 18, 22)}
-                  color="#ddd"
-                />
-              </TouchableOpacity>
-            </View>
             <TouchableOpacity
-              style={[
-                styles.button,
-                {
-                  height: fieldHeight,
-                  minWidth: clamp(scale(136), 124, 160),
-                  paddingHorizontal: clamp(scale(18), isSmallScreen ? 14 : 16, 24),
-                  marginTop: isLandscape ? clamp(scale(4), 2, 8) : clamp(scale(8), 4, 12),
-                },
-                isSubmitting && styles.buttonDisabled,
-              ]}
-              onPress={handleLogin}
-              disabled={isSubmitting}
+              onPress={() => setPasswordVisible(!passwordVisible)}
+              hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
             >
-              {isSubmitting ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text
-                  style={[
-                    styles.buttonText,
-                    { fontSize: clamp(scale(18), 16, 18) },
-                  ]}
-                >
-                  Login
-                </Text>
-              )}
+              <Icon
+                name={passwordVisible ? 'visibility-off' : 'visibility'}
+                size={clamp(scale(20), 18, 22)}
+                color="#ddd"
+              />
             </TouchableOpacity>
-          </LinearGradient>
-        </ScrollView>
+          </View>
+          <TouchableOpacity
+            style={[
+              styles.button,
+              {
+                height: fieldHeight,
+                minWidth: clamp(scale(136), 124, 160),
+                paddingHorizontal: clamp(
+                  scale(18),
+                  isSmallScreen ? 14 : 16,
+                  24,
+                ),
+                marginTop: isLandscape
+                  ? clamp(scale(4), 2, 8)
+                  : clamp(scale(8), 4, 12),
+              },
+              isSubmitting && styles.buttonDisabled,
+            ]}
+            onPress={handleLogin}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text
+                style={[
+                  styles.buttonText,
+                  { fontSize: clamp(scale(18), 16, 18) },
+                ]}
+              >
+                Login
+              </Text>
+            )}
+          </TouchableOpacity>
+        </LinearGradient>
+      </ScrollView>
       {alertConfig.visible && (
         <View style={styles.alertOverlay}>
           <LinearGradient
-            colors={['#1c3b82','#1c3b82', '#000479']}
+            colors={['#1c3b82', '#1c3b82', '#000479']}
             start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
+            end={{ x: 1, y: 0 }}
             style={[
               styles.alertBox,
               {
                 width: Math.min(width - 40, isTablet ? 420 : 360),
-                paddingHorizontal: clamp(scale(24), isSmallScreen ? 18 : 20, isTablet ? 32 : 28),
-                paddingVertical: clamp(scale(28), isSmallScreen ? 22 : 24, isTablet ? 34 : 30),
+                paddingHorizontal: clamp(
+                  scale(24),
+                  isSmallScreen ? 18 : 20,
+                  isTablet ? 32 : 28,
+                ),
+                paddingVertical: clamp(
+                  scale(28),
+                  isSmallScreen ? 22 : 24,
+                  isTablet ? 34 : 30,
+                ),
                 borderRadius: clamp(scale(28), 20, 34),
               },
             ]}
@@ -338,7 +342,12 @@ navigation.reset({
                 }))
               }
             >
-              <Text style={[styles.alertButtonText, { fontSize: clamp(scale(15), 13, 17) }]}>
+              <Text
+                style={[
+                  styles.alertButtonText,
+                  { fontSize: clamp(scale(15), 13, 17) },
+                ]}
+              >
                 OK
               </Text>
             </TouchableOpacity>
@@ -372,22 +381,22 @@ const styles = StyleSheet.create<Record<string, any>>({
   },
   scrollContent: {
     flexGrow: 1,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   logo: {
     fontSize: 36,
-    fontWeight: "bold",
-    color: "#fff",
+    fontWeight: 'bold',
+    color: '#fff',
   },
   tagline: {
-    color: "#ccc",
+    color: '#ccc',
     marginBottom: 40,
   },
   card: {
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 2,
@@ -397,35 +406,35 @@ const styles = StyleSheet.create<Record<string, any>>({
     elevation: 5,
   },
   input: {
-    backgroundColor: "rgba(255,255,255,0.15)",
+    backgroundColor: 'rgba(255,255,255,0.15)',
     borderRadius: 12,
-    width: "100%",
-    color: "#fff",
+    width: '100%',
+    color: '#fff',
   },
   passwordContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.15)",
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.15)',
     borderRadius: 12,
-    width: "100%",
+    width: '100%',
   },
   passwordInput: {
     flex: 1,
-    color: "#fff",
+    color: '#fff',
     paddingVertical: 12,
   },
   button: {
-    backgroundColor: "#1C2541",
+    backgroundColor: '#1C2541',
     borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   buttonDisabled: {
     opacity: 0.7,
   },
   buttonText: {
-    color: "#fff",
-    fontWeight: "bold",
+    color: '#fff',
+    fontWeight: 'bold',
   },
   alertOverlay: {
     position: 'absolute',

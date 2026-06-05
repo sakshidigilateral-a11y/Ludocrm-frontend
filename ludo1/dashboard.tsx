@@ -241,8 +241,8 @@ const ProfilePage = () => {
   // because `user?.flmId` can be empty in the AuthContext.
   // Creator/FLM id for boards/status filtering.
   // Must match `boards.creator` in MySQL.
-  // const creatorId = 'A1234';
-  const creatorId = 'S1101';
+  const creatorId = 'A1234';
+  // const creatorId = 'S1101';
 
   const profileTeamLogo = getTeamLogo(profile.teamName);
 
@@ -334,25 +334,40 @@ const ProfilePage = () => {
           body: JSON.stringify(requestBody),
         }),
 
-        fetch(`${baseUrl}/api/profile/get?playerId=${playerId}&role=${playerRole}`),
+        fetch(
+          `${baseUrl}/api/profile/get?playerId=${playerId}&role=${playerRole}`,
+        ),
       ]);
 
       console.log('Profile details response:', detailsResponse);
       console.log('Profile image response:', imageResponse);
 
       const json: MrDetailsResponse = await detailsResponse.json();
-      const imageJson = await imageResponse.json();
+
+      console.log('DETAILS API RESPONSE =>', json);
+      console.log('DETAILS DATA =>', json?.data);
+      console.log('ROLE =>', playerRole);
+      console.log('PLAYER ID =>', playerId);
+      let imageJson = { success: false };
+
+      if (imageResponse.ok) {
+        imageJson = await imageResponse.json();
+      }
 
       if (!json.success || !json.data) {
         return;
       }
 
       const data = json.data;
-      const profileImageUrl =
-        imageJson.success && imageJson.imageName
-          ? `${baseUrl}/profileImage/${imageJson.imageName}?t=${Date.now()}`
-          : null;
+      const profileImageUrl = null;
 
+      console.log('PROFILE TO SET =>', {
+        username: data.mrName || data.flmName,
+        teamName: data.teamName,
+        hq: data.hq,
+        zone: data.zone,
+        region: data.region,
+      });
       setProfile({
         username: data.mrName || data.flmName || user?.name || null,
         teamName: data.teamName || user?.teamName || null,
@@ -382,6 +397,7 @@ const ProfilePage = () => {
       console.warn('Dashboard profile fetch failed:', error);
     }
   }, [
+    baseUrl,
     playerId,
     playerRole,
     session?.token,
@@ -447,6 +463,7 @@ const ProfilePage = () => {
         });
 
         const json: BoardStatusResponse = await response.json();
+        console.log('DETAILS DATA =>', json.data);
         if (!json.success || !json.data) {
           return;
         }

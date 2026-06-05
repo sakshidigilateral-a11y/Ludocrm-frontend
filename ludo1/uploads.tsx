@@ -106,10 +106,11 @@ const UploadsScreen = () => {
 
     loadBaseUrl();
   }, []);
-  useEffect(() => {
-    fetchUploads();
-    return () => abortRef.current?.abort();
-  }, [selectedDate, filter, statusFilter]);
+// AFTER - re-runs when baseUrl becomes available
+useEffect(() => {
+  fetchUploads();
+  return () => abortRef.current?.abort();
+}, [selectedDate, filter, statusFilter, baseUrl]); // ← add baseUrl
 
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState('');
@@ -138,9 +139,22 @@ const UploadsScreen = () => {
     );
     setAlertVisible(true);
   };
+  console.log('USER =>', JSON.stringify(user, null, 2));
+console.log('ROLE =>', user?.role);
+console.log('MR ID =>', user?.mrId);
+console.log('FLM ID =>', user?.flmId);
+console.log('MANAGER ID =>', managerId);
+console.log('BASE URL =>', baseUrl);
   const fetchUploads = useCallback(async () => {
     if (!baseUrl) return;
-
+console.log('fetchUploads called =>', {
+    baseUrl,
+    managerId,
+    isFlm,
+    statusFilter,
+    filter,
+    selectedDate: selectedDate?.toISOString().split('T')[0],
+  });
     abortRef.current?.abort();
     abortRef.current = new AbortController();
     const signal = abortRef.current.signal;
@@ -162,6 +176,7 @@ const UploadsScreen = () => {
         );
         const json = await res.json();
         console.log('data', json);
+        
         setData((json.data || []).map(mapUpload));
       // } else {
       //   if (statusFilter === 'approved') {

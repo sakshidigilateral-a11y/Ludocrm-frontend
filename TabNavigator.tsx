@@ -9,13 +9,13 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 
 import AlertModal, { AlertButton } from './components/AlertModal';
 
-import Dashboard from './ludo3/dashboard';
-import Rank from './ludo3/rank';
+import Dashboard from './ludo1/dashboard';
+import Rank from './ludo1/rank';
 import Notification from './ludo2/notification';
-import Run from './ludo3/run';
-import NewUpload from './ludo3/newupload';
+import Run from './ludo1/run';
+import NewUpload from './ludo1/newupload';
 
-import Upload from './ludo2/uploads';
+import Upload from './ludo1/uploads';
 
 import {  authHeaders, getBaseUrl } from './api';
 

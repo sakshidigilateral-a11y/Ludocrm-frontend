@@ -374,8 +374,9 @@ const baseUrl = session?.backendUrl || '';
 
     try {
       setIsSubmitting(true);
+      
       const response = await fetch(
-        `${baseUrl}/api/mr/upload/${user?.id}`,
+  `${baseUrl}/api/mr/upload/${user?.mrId}`,
         {
           method: 'POST',
           headers: {

@@ -78,7 +78,7 @@ const fileNameFromAsset = (asset: Asset, index: number) =>
 
 export default function UploadPrescriptionScreen() {
   const { session, user } = useAuth();
-const baseUrl = session?.backendUrl || '';
+  const baseUrl = session?.backendUrl || '';
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [camps, setCamps] = useState<Camp[]>([]);
@@ -88,7 +88,9 @@ const baseUrl = session?.backendUrl || '';
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState<string>('');
   const [alertMessage, setAlertMessage] = useState<string>('');
-  const [alertVariant, setAlertVariant] = useState<'info' | 'error' | 'confirm'>('info');
+  const [alertVariant, setAlertVariant] = useState<
+    'info' | 'error' | 'confirm'
+  >('info');
   const closeAlert = () => setAlertVisible(false);
 
   const showAlert = (
@@ -177,7 +179,9 @@ const baseUrl = session?.backendUrl || '';
       if (lowerType !== 'pob' && lowerType !== 'camp') {
         const count = Number(value) || 0;
         setImageCount(count);
-        setSelectedImages(Array.from({ length: count }, (_, i) => selectedImages[i] || null));
+        setSelectedImages(
+          Array.from({ length: count }, (_, i) => selectedImages[i] || null),
+        );
       }
       return;
     }
@@ -241,7 +245,8 @@ const baseUrl = session?.backendUrl || '';
     } finally {
       setIsLoading(false);
     }
-  }, [session?.token]);
+  }, [baseUrl, session?.token]);
+
 
   useEffect(() => {
     loadInitialData();
@@ -262,20 +267,20 @@ const baseUrl = session?.backendUrl || '';
 
       if (result.errorCode) {
         showAlert(
-  'Image Picker Error',
-  result.errorMessage || 'Unable to pick image.',
-  'error',
-);
+          'Image Picker Error',
+          result.errorMessage || 'Unable to pick image.',
+          'error',
+        );
         return;
       }
 
       const asset = result.assets?.[0];
       if (!asset?.uri) {
-       showAlert(
-  'Image Picker Error',
-  'No image was returned from the picker.',
-  'warning',
-);
+        showAlert(
+          'Image Picker Error',
+          'No image was returned from the picker.',
+          'warning',
+        );
         return;
       }
 
@@ -324,10 +329,10 @@ const baseUrl = session?.backendUrl || '';
 
     if (!user?.id) {
       showAlert(
-  'Session Expired',
-  'Please login again before uploading.',
-  'warning',
-);
+        'Session Expired',
+        'Please login again before uploading.',
+        'warning',
+      );
       return false;
     }
 
@@ -347,14 +352,10 @@ const baseUrl = session?.backendUrl || '';
     if (!form.scCode.trim()) {
       missing.push('scCode');
     }
-  if (form.mobNo && form.mobNo.length !== 10) {
-  showAlert(
-    'Invalid Number',
-    'Mobile number must be 10 digits',
-    'warning',
-  );
-  return false;
-}
+    if (form.mobNo && form.mobNo.length !== 10) {
+      showAlert('Invalid Number', 'Mobile number must be 10 digits', 'warning');
+      return false;
+    }
     activityFields.forEach(field => {
       if (field.required && !form[field.fieldName]?.trim()) {
         missing.push(field.fieldName);
@@ -380,13 +381,13 @@ const baseUrl = session?.backendUrl || '';
 
     const body = new FormData();
     body.append('type', selectedType);
-   Object.entries(form).forEach(([key, value]) => {
-  if (value !== '') {
-    body.append(key, value);
-  }
-});
+    Object.entries(form).forEach(([key, value]) => {
+      if (value !== '') {
+        body.append(key, value);
+      }
+    });
 
-body.append('defaultFactor', '1');
+    body.append('defaultFactor', '1');
 
     selectedImages.forEach((asset, index) => {
       if (!asset?.uri) {
@@ -402,26 +403,26 @@ body.append('defaultFactor', '1');
 
     try {
       setIsSubmitting(true);
-      const response = await fetch(
-        `${baseUrl}/api/mr/upload/${user?.id}`,
-        {
-          method: 'POST',
-          headers: {
-            ...(session?.token
-              ? { Authorization: `Bearer ${session.token}` }
-              : {}),
-          },
-          body,
+      const response = await fetch(`${baseUrl}/api/mr/upload/${user?.mrId}`, {
+        method: 'POST',
+        headers: {
+          ...(session?.token
+            ? { Authorization: `Bearer ${session.token}` }
+            : {}),
         },
-      );
+        body,
+      });
+      console.log('USER =>', user);
+      console.log('USER ID =>', user?.id);
+      console.log('USER ROLE =>', user?.role);
       const json = await response.json();
 
       if (!response.ok || !json.success) {
         showAlert(
-  'Upload Failed',
-  json.message || 'Unable to submit upload.',
-  'error',
-);
+          'Upload Failed',
+          json.message || 'Unable to submit upload.',
+          'error',
+        );
         return;
       }
 
@@ -484,58 +485,52 @@ body.append('defaultFactor', '1');
 
   const renderActivityField = (field: ActivityField) => {
     if (field.fieldName === 'rxnDuration') {
-  return (
-    <View
-      key="defaultFactor"
-      style={{
-        opacity: 0.55,
-      }}
-    >
-      <LinearGradient
-        colors={['#3273a8', '#42b983']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.inputGradient}
-      >
-        <View style={styles.innerInputContainer}>
-          <View>
-            <Text
-              style={{
-                color: '#a0a0c0',
-                fontSize: 12,
-                marginBottom: 2,
-              }}
-            >
-              Default Factor
-            </Text>
+      return (
+        <View
+          key="defaultFactor"
+          style={{
+            opacity: 0.55,
+          }}
+        >
+          <LinearGradient
+            colors={['#3273a8', '#42b983']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.inputGradient}
+          >
+            <View style={styles.innerInputContainer}>
+              <View>
+                <Text
+                  style={{
+                    color: '#a0a0c0',
+                    fontSize: 12,
+                    marginBottom: 2,
+                  }}
+                >
+                  Default Factor
+                </Text>
 
-            <Text
-              style={{
-                color: 'white',
-                fontSize: 15,
-                fontWeight: 'bold',
-              }}
-            >
-              1
-            </Text>
-          </View>
+                <Text
+                  style={{
+                    color: 'white',
+                    fontSize: 15,
+                    fontWeight: 'bold',
+                  }}
+                >
+                  1
+                </Text>
+              </View>
 
-          <Icon
-            name="lock"
-            size={18}
-            color="rgba(255,255,255,0.5)"
-          />
+              <Icon name="lock" size={18} color="rgba(255,255,255,0.5)" />
+            </View>
+          </LinearGradient>
         </View>
-      </LinearGradient>
-    </View>
-  );
-}
+      );
+    }
     const label = `${fieldLabel(field.fieldName)}${field.required ? '*' : ''}`;
     const options = fieldOptions(field);
-const rxnOptions =
-  field.fieldName === 'noRxns'
-    ? imageCountOptions
-    : options;
+    const rxnOptions =
+      field.fieldName === 'noRxns' ? imageCountOptions : options;
     if (
       options.length > 0 ||
       field.fieldName === 'brandName' ||
@@ -544,31 +539,25 @@ const rxnOptions =
     ) {
       return (
         <View
-  key={field.fieldName}
-  style={{
-    opacity:
-      field.fieldName === 'noRxns' && !selectedBrand
-        ? 0.45
-        : 1,
-  }}
->
-  {field.fieldName === 'noRxns' && !selectedBrand ? (
-    <TouchableOpacity activeOpacity={1}>
-      <DropdownField
-        placeholder="Select Brand First"
-        active={false}
-      />
-    </TouchableOpacity>
-  ) : (
-    renderDropdown(
-      field.fieldName,
-      form[field.fieldName] || '',
-      label,
-      rxnOptions,
-      value => updateField(field.fieldName, value),
-    )
-  )}
-</View>
+          key={field.fieldName}
+          style={{
+            opacity: field.fieldName === 'noRxns' && !selectedBrand ? 0.45 : 1,
+          }}
+        >
+          {field.fieldName === 'noRxns' && !selectedBrand ? (
+            <TouchableOpacity activeOpacity={1}>
+              <DropdownField placeholder="Select Brand First" active={false} />
+            </TouchableOpacity>
+          ) : (
+            renderDropdown(
+              field.fieldName,
+              form[field.fieldName] || '',
+              label,
+              rxnOptions,
+              value => updateField(field.fieldName, value),
+            )
+          )}
+        </View>
       );
     }
 
@@ -582,15 +571,13 @@ const rxnOptions =
       />
     );
   };
-const lowerType = selectedType.toLowerCase();
+  const lowerType = selectedType.toLowerCase();
 
-const isSingleImageType =
-  lowerType === 'pob' || lowerType === 'camp';
+  const isSingleImageType = lowerType === 'pob' || lowerType === 'camp';
 
-const shouldShowImages =
-  isSingleImageType ||
-  (lowerType === 'prescription' &&
-    Number(form.noRxns) > 0);
+  const shouldShowImages =
+    isSingleImageType ||
+    (lowerType === 'prescription' && Number(form.noRxns) > 0);
   return (
     <ImageBackground
       source={require('../assets/newAssets/bgMain.png')}
@@ -853,69 +840,69 @@ const styles = StyleSheet.create<Record<string, any>>({
   safeArea: {
     flex: 1,
   },
- alertOverlay: {
-  position: 'absolute',
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 0,
-  backgroundColor: 'rgba(0,0,0,0.6)',
-  justifyContent: 'center',
-  alignItems: 'center',
-  zIndex: 999,
-},
+  alertOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 999,
+  },
 
-alertBox: {
-  width: '82%',
-  height: '20%',
-  borderRadius: 24,
-  paddingHorizontal: 25,
-  paddingVertical: 25,
-  alignItems: 'center',
-  borderWidth:2,
-  borderColor:'white'
-},
+  alertBox: {
+    width: '82%',
+    height: '20%',
+    borderRadius: 24,
+    paddingHorizontal: 25,
+    paddingVertical: 25,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'white',
+  },
 
-successAlert: {
-  backgroundColor: '#000f84aa',
-},
+  successAlert: {
+    backgroundColor: '#000f84aa',
+  },
 
-errorAlert: {
-  backgroundColor: '#000f84aa',
-},
+  errorAlert: {
+    backgroundColor: '#000f84aa',
+  },
 
-warningAlert: {
-  backgroundColor: '#000f84aa',
-},
+  warningAlert: {
+    backgroundColor: '#000f84aa',
+  },
 
-alertTitle: {
-  color: 'white',
-  fontSize: 22,
-  fontWeight: 'bold',
-  marginTop: 12,
-},
+  alertTitle: {
+    color: 'white',
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginTop: 12,
+  },
 
-alertMessage: {
-  color: 'white',
-  fontSize: 15,
-  textAlign: 'center',
-  marginTop: 10,
-  lineHeight: 22,
-},
+  alertMessage: {
+    color: 'white',
+    fontSize: 15,
+    textAlign: 'center',
+    marginTop: 10,
+    lineHeight: 22,
+  },
 
-alertButton: {
-  marginTop: 20,
-  backgroundColor: 'rgb(140, 73, 226)',
-  paddingHorizontal: 30,
-  paddingVertical: 10,
-  borderRadius: 15,
-},
+  alertButton: {
+    marginTop: 20,
+    backgroundColor: 'rgb(140, 73, 226)',
+    paddingHorizontal: 30,
+    paddingVertical: 10,
+    borderRadius: 15,
+  },
 
-alertButtonText: {
-  color: 'white',
-  fontWeight: 'bold',
-  fontSize: 15,
-},
+  alertButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 15,
+  },
   scrollContent: {
     alignItems: 'center',
     paddingHorizontal: 16,

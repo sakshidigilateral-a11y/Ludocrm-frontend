@@ -19,7 +19,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { getBaseUrl} from '../api';
+import { getBaseUrl } from '../api';
 import { useAuth } from '../auth/AuthContext';
 import ImageViewer from 'react-native-image-zoom-viewer';
 import AlertModal, { AlertButton } from '../components/AlertModal';
@@ -57,16 +57,16 @@ interface UploadEntry {
 const TYPES = ['All Types', 'prescription', 'pob', 'camp'];
 
 const UploadsScreen = () => {
-  const { user } = useAuth();
-  const isFlm = user?.role?.toLowerCase() === 'flm';
-
   const [filter, setFilter] = useState('All Types');
   const [showDropdown, setShowDropdown] = useState(false);
   const [btnLayout, setBtnLayout] = useState<LayoutRectangle | null>(null);
   const [data, setData] = useState<UploadEntry[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
+  const { user, session } = useAuth(); // ← single call
+  const isFlm = user?.role?.toLowerCase() === 'flm';
+  const baseUrl = session?.backendUrl || '';
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   // Expanded row
@@ -83,20 +83,26 @@ const UploadsScreen = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [actionUpload, setActionUpload] = useState<UploadEntry | null>(null);
 
-  const managerId = user?.id || '';
+  const managerId =
+    user?.role === 'FLM'
+      ? user?.flmId
+      : user?.role === 'MR'
+      ? user?.mrId
+      : user?.id || '';
+
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     fetchUploads();
     return () => abortRef.current?.abort();
-  }, [selectedDate, filter]);
+  }, [fetchUploads]);
 
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState('');
   const [alertMessage, setAlertMessage] = useState('');
-  const [alertVariant, setAlertVariant] = useState<'info' | 'error' | 'confirm'>(
-    'info',
-  );
+  const [alertVariant, setAlertVariant] = useState<
+    'info' | 'error' | 'confirm'
+  >('info');
 
   const alertButtons: AlertButton[] = [
     {
@@ -113,7 +119,9 @@ const UploadsScreen = () => {
   ) => {
     setAlertTitle(title);
     setAlertMessage(message);
-    setAlertVariant(type === 'error' ? 'error' : type === 'warning' ? 'info' : 'confirm');
+    setAlertVariant(
+      type === 'error' ? 'error' : type === 'warning' ? 'info' : 'confirm',
+    );
     setAlertVisible(true);
   };
   const fetchUploads = useCallback(async () => {
@@ -122,6 +130,13 @@ const UploadsScreen = () => {
     const signal = abortRef.current.signal;
 
     setLoading(true);
+    console.log('=== FETCH UPLOADS CALLED ===');
+    console.log('baseUrl =>', baseUrl);
+    console.log('managerId =>', managerId);
+    console.log('isFlm =>', isFlm);
+    console.log('selectedDate =>', selectedDate);
+    console.log('filter =>', filter);
+    console.log('user =>', JSON.stringify(user));
     try {
       const dateParam = selectedDate
         ? `date=${selectedDate.toISOString().split('T')[0]}`
@@ -161,7 +176,7 @@ const UploadsScreen = () => {
     } finally {
       if (!signal.aborted) setLoading(false);
     }
-  }, [selectedDate, filter, isFlm, managerId]);
+  }, [selectedDate, filter, isFlm, managerId, baseUrl]);
 
   const mapUpload = (item: any): UploadEntry => ({
     id: item.id,
@@ -205,8 +220,8 @@ const UploadsScreen = () => {
   };
 
   const openDetail = (item: UploadEntry) => {
-  setExpandedId(prev => (prev === item.id ? null : item.id));
-};
+    setExpandedId(prev => (prev === item.id ? null : item.id));
+  };
 
   const openImageViewer = (images: string[], index: number) => {
     setImageViewerImages(images);
@@ -277,11 +292,11 @@ const UploadsScreen = () => {
     }
   };
 
-const changeDateBy = (days: number) => {
-  const newDate = selectedDate ? new Date(selectedDate) : new Date();
-  newDate.setDate(newDate.getDate() + days);
-  setSelectedDate(newDate);
-};
+  const changeDateBy = (days: number) => {
+    const newDate = selectedDate ? new Date(selectedDate) : new Date();
+    newDate.setDate(newDate.getDate() + days);
+    setSelectedDate(newDate);
+  };
 
   const onDateChange = (event: any, date?: Date) => {
     if (Platform.OS === 'android') setShowDatePicker(false);
@@ -294,13 +309,13 @@ const changeDateBy = (days: number) => {
   const openDatePicker = () => {
     if (Platform.OS === 'android') {
       DateTimePickerAndroid.open({
-  value: selectedDate || new Date(),
-  mode: 'date',
-  maximumDate: new Date(), // ADD THIS
-  onChange: (_event: any, date?: Date) => {
-    if (date) setSelectedDate(date);
-  },
-});
+        value: selectedDate || new Date(),
+        mode: 'date',
+        maximumDate: new Date(), // ADD THIS
+        onChange: (_event: any, date?: Date) => {
+          if (date) setSelectedDate(date);
+        },
+      });
     } else {
       setShowDatePicker(true);
     }
@@ -434,7 +449,7 @@ const changeDateBy = (days: number) => {
             )}
 
             {/* Approve / Reject */}
-            {item.status === 'pending' && (
+            {isFlm && item.status === 'pending' && (
               <View style={styles.actionRow}>
                 <TouchableOpacity
                   style={styles.approveBtn}
@@ -447,6 +462,7 @@ const changeDateBy = (days: number) => {
                     <Text style={styles.actionBtnText}>✓ Approve</Text>
                   )}
                 </TouchableOpacity>
+
                 <TouchableOpacity
                   style={styles.rejectBtn}
                   onPress={() => {
@@ -464,8 +480,7 @@ const changeDateBy = (days: number) => {
       </View>
     );
   };
-const isToday =
-  selectedDate?.toDateString() === new Date().toDateString();
+  const isToday = selectedDate?.toDateString() === new Date().toDateString();
   return (
     <View style={styles.container}>
       <Image
@@ -560,12 +575,9 @@ const isToday =
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-  onPress={() => !isToday && changeDateBy(1)}
-  style={[
-    styles.dateBtn,
-    isToday && { opacity: 0.4 }
-  ]}
->
+                  onPress={() => !isToday && changeDateBy(1)}
+                  style={[styles.dateBtn, isToday && { opacity: 0.4 }]}
+                >
                   <Icon name="chevron-right" size={s(20)} color="#333" />
                 </TouchableOpacity>
               </View>
@@ -791,8 +803,18 @@ const styles = StyleSheet.create({
     borderRadius: s(20),
   },
   dateText: { color: '#333', fontWeight: 'bold', fontSize: s(11) },
-  tableBorder: { borderWidth: 2, borderColor: 'rgba(255,255,255,0.7)',borderRadius:20 ,overflow:'hidden'},
-  tableContainer: { paddingHorizontal: s(8), paddingVertical: s(8),borderTopRightRadius:20,borderTopLeftRadius:18 },
+  tableBorder: {
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.7)',
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  tableContainer: {
+    paddingHorizontal: s(8),
+    paddingVertical: s(8),
+    borderTopRightRadius: 20,
+    borderTopLeftRadius: 18,
+  },
   tableHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -994,13 +1016,13 @@ const styles = StyleSheet.create({
   // Expanded panel
   expandedPanel: {
     backgroundColor: 'rgba(255,255,255,0.08)',
-    marginHorizontal:s(10),
+    marginHorizontal: s(10),
     paddingHorizontal: s(12),
     paddingVertical: s(12),
     marginBottom: s(2),
     borderBottomWidth: 2,
     borderBottomColor: 'rgba(255,255,255,0.15)',
-    borderRadius:20
+    borderRadius: 20,
   },
   infoGrid: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: s(6) },
   infoItem: { width: '50%', paddingVertical: s(4) },

@@ -554,10 +554,16 @@ export default function MyBoardScreen(): React.ReactElement {
   const { session, user, setSession } = useAuth();
   const baseUrl = session?.backendUrl || '';
   const isFlm = user?.role?.toLowerCase() === 'flm';
-  const myFlmId = isFlm ? user?.id : user?.flmId;
+ const myFlmId = user?.flmId;
+  console.log('USER ID =>', user?.id);
+console.log('MR ID =>', user?.mrId);
+console.log('FLM ID =>', user?.flmId);
+console.log('ROLE =>', user?.role);
+console.log('myFlmId =>', myFlmId);
   const [boardId, setBoardId] = useState<number | null>(null);
   const [pawns, setPawns] = useState<Pawn[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
+  
   const [loading, setLoading] = useState(true);
   const [diceRows, setDiceRows] = useState<DiceByPlayerRow[]>([]);
   const myPlayerColor =
@@ -591,9 +597,9 @@ export default function MyBoardScreen(): React.ReactElement {
     [getPerspectiveArea],
   );
 
-  // const creatorId = 'A1234';
-const creatorId =
-  user?.adminId || '';
+    const creatorId = 'A1234';
+// const creatorId =
+//   user?.adminId || '';
   
   const socketRef = useRef<Socket | null>(null);
   const pawnsRef = useRef<Pawn[]>([]);
@@ -790,24 +796,27 @@ const creatorId =
     }
   }, [myFlmId, session?.token]);
 
-  const fetchBoardState = async (bid: number) => {
-    try {
-      const baseUrl = await getBaseUrl();
+const fetchBoardState = async (bid: number) => {
+  try {
+    const baseUrl = await getBaseUrl();
+    console.log('fetchBoardState called with bid:', bid);
+    console.log('creatorId being used:', creatorId);  // ← add this
 
-      const res = await fetch(`${baseUrl}/api/flm/boards/navigate`, {
-        method: 'POST',
-        headers: {
-          ...authHeaders(session?.token),
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          creator: creatorId,
-          direction: 'current',
-          currentBoardId: bid,
-          excludePlayerId: null,
-        }),
-      });
-      const json = await res.json();
+    const res = await fetch(`${baseUrl}/api/flm/boards/navigate`, {
+      method: 'POST',
+      headers: {
+        ...authHeaders(session?.token),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        creator: creatorId,
+        direction: 'current',
+        currentBoardId: bid,
+        excludePlayerId: null,
+      }),
+    });
+    const json = await res.json();
+    console.log('navigate API full response:', JSON.stringify(json, null, 2)); // ← add this
       if (!json.success || !json.data) return;
       setPawns(json.data.pawns || []);
       setPlayers(json.data.players || []);
@@ -890,362 +899,61 @@ const creatorId =
     fetchBoard();
   }, [fetchBoard]);
 
-  useEffect(() => {
-    if (!boardId || !myFlmId) {
-      return;
-    }
-    if (socketRef.current) {
-      return;
-    }
-    const baseUrl = await getBaseUrl();
+// useEffect(() => {
+//   const initSocket = async () => {
+//     if (!boardId || !myFlmId) {
+//       return;
+//     }
 
+//     if (socketRef.current) {
+//       return;
+//     }
+
+//     const baseUrl = await getBaseUrl();
+
+//     const socket = io(baseUrl, {
+//       transports: ['websocket'],
+//       reconnection: true,
+//       forceNew: true,
+//     });
+
+//     socketRef.current = socket;
+//   };
+
+//   initSocket();
+// }, [boardId, myFlmId]);
+
+useEffect(() => {
+  const initSocket = async () => {
+    if (!boardId || !myFlmId) return;
+    if (socketRef.current) return;
+
+    const baseUrl = await getBaseUrl();
     const socket = io(baseUrl, {
       transports: ['websocket'],
       reconnection: true,
       forceNew: true,
     });
-    socketRef.current = socket;
+
     socket.on('connect', () => {
-      socket.emit(
-        'joinGame',
-        {
-          boardId,
-          playerId: myFlmId,
-          userId: user?.id,
-        },
-        (response: any) => {
-          if (!response?.ok) {
-            return;
-          }
-          const data = response?.data;
-          if (!data) {
-            return;
-          }
-          setPlayers(data.players || []);
-          setPawns(data.pawns || []);
-          setBoardData(data);
-          setTurnState(response?.turnState || null);
-          setLoggedInMrStats(data.loggedInMrStats || null);
-          if (data.loggedInMrStats?.unplayedDiceValue) {
-            setCurrentDiceValue(Number(data.loggedInMrStats.unplayedDiceValue));
-          }
-          const incomingDiceRows = normalizeDiceRows(
-            data.diceValue || data.allPlayersDice || [],
-          );
-          setDiceRows(incomingDiceRows);
-          fetchActivePlayers(boardId);
-        },
-      );
-    });
-    socket.on('activePlayerJoined', async (data: any) => {
-      if (data?.boardId !== boardId) {
-        return;
-      }
-      Toast.show({
-        type: 'success',
-        text1: 'Player Joined',
-        text2: `${data?.playerName || 'A player'} joined the board`,
-        position: 'top',
-        visibilityTime: 3000,
-      });
-      fetchActivePlayers(boardId);
-      if (data?.turnState) {
-        setTurnState(data.turnState);
-      }
-      if (
-        data?.loggedInMrStats &&
-        String(data.loggedInMrStats.flmId) === String(myFlmId)
-      ) {
-        setLoggedInMrStats(data.loggedInMrStats);
-        if (data.loggedInMrStats.unplayedDiceValue) {
-          setCurrentDiceValue(Number(data.loggedInMrStats.unplayedDiceValue));
-        }
-      }
-    });
-    socket.on('playerJoined', (data: any) => {
-      if (data?.boardId !== boardId) {
-        return;
-      }
-      fetchActivePlayers(boardId);
-    });
-    socket.on('activePlayerLeft', async (data: any) => {
-      if (data?.boardId !== boardId) {
-        return;
-      }
-      Toast.show({
-        type: 'error',
-        text1: 'Player Left',
-        text2: `${data?.playerName || 'A player'} left the board`,
-        position: 'top',
-        visibilityTime: 3000,
+      // ← ADD THIS: join the room so socket.boardId and socket.playerId get set
+      socket.emit('joinGame', {
+        boardId,
+        playerId: myFlmId,
+        userId: user?.mrId,
       });
     });
-    socket.on('roomUpdate', (data: any) => {
-      if (data?.boardId !== boardId) {
-        return;
-      }
-      if (data?.turnState) {
-        setTurnState(data.turnState);
-      }
+
+    // add event listeners here too
+    socket.on('pawnMoved', (delta: any) => {
+      // handle updates
     });
-    socket.on('turnStateUpdate', (data: any) => {
-      if (data?.boardId !== boardId) {
-        return;
-      }
-      setTurnState({
-        mode: data.mode,
-        currentTurnPlayerId: data.currentTurnPlayerId,
-        turnOrder: data.turnOrder,
-      });
-      setTurnSecondsLeft(data.mode === 'turn' ? 30 : null);
-    });
-    socket.on('turnTimedOut', (data: any) => {
-      if (data?.boardId !== boardId) {
-        return;
-      }
-      if (String(data.playerId) === String(myFlmId)) {
-        setCurrentDiceValue(null);
-      }
-    });
-    socket.on('diceRolled', (data: any) => {
-      if (data?.boardId !== boardId) {
-        return;
-      }
-      if (Array.isArray(data?.allPlayersDice)) {
-        const incomingDiceRows = normalizeDiceRows(
-          data.diceValue || data.allPlayersDice || [],
-        );
-        setDiceRows(incomingDiceRows);
-      }
-      if (Array.isArray(data?.updatedPlayers)) {
-        setPlayers(prev =>
-          prev.map(p => {
-            const updated = data.updatedPlayers.find(
-              (u: any) => String(u.playerId) === String(p.playerId),
-            );
-            return updated ? { ...p, ...updated } : p;
-          }),
-        );
-      }
-      if (
-        data?.loggedInMrStats &&
-        String(data.loggedInMrStats.flmId) === String(myFlmId)
-      ) {
-        setLoggedInMrStats(data.loggedInMrStats);
-      }
-      if (
-        String(data?.teamId) === String(myFlmId) ||
-        String(data?.playerId) === String(user?.id)
-      ) {
-        setCurrentDiceValue(
-          data.diceValue == null ? null : Number(data.diceValue),
-        );
-      }
-    });
-    socket.on('newDiceValue', (data: any) => {
-      if (Array.isArray(data?.diceValues)) {
-        setDiceRows(prev => [
-          ...prev.filter(
-            r => String(r.playerId) !== String(myFlmId) || r.diceValue == null,
-          ),
-          ...normalizeDiceRows(data.diceValues).map(row => ({
-            ...row,
-            playerId: String(myFlmId),
-          })),
-        ]);
-      }
-    });
-    socket.on('diceCleared', (data: any) => {
-      if (Array.isArray(data?.allPlayersDice)) {
-        const incomingDiceRows = normalizeDiceRows(
-          data.diceValue || data.allPlayersDice || [],
-        );
-        setDiceRows(incomingDiceRows);
-      }
-      if (
-        String(data?.teamId) === String(myFlmId) ||
-        String(data?.playerId) === String(user?.id)
-      ) {
-        setCurrentDiceValue(null);
-      }
-    });
-    socket.on('pawnMoved', async (delta: any) => {
-      const d = delta?.data;
-      if (!d || d.boardId !== boardId) {
-        return;
-      }
 
-      if (Array.isArray(d.updatedPlayers)) {
-        setPlayers(prev =>
-          prev.map(p => {
-            const updated = d.updatedPlayers.find(
-              (u: any) => u.playerId === p.playerId,
-            );
-            return updated ? { ...p, ...updated } : p;
-          }),
-        );
-      }
+    socketRef.current = socket;
+  };
 
-      if (d.loggedInMrStats) {
-        setLoggedInMrStats(d.loggedInMrStats);
-      }
-
-      if (Array.isArray(d.updatedDice)) {
-        setDiceRows(prev => {
-          const next = [...prev];
-          d.updatedDice.forEach((updated: any) => {
-            const index = next.findIndex(
-              r => String(r.playerId) === String(updated.playerId),
-            );
-            if (index >= 0) {
-              next[index] = {
-                ...next[index],
-                diceValue: updated.diceValue,
-                uploadId:
-                  updated.id === null || updated.id === undefined
-                    ? null
-                    : String(updated.id),
-                rolledAt: updated.rolledAt,
-              };
-            }
-          });
-          return next;
-        });
-      }
-
-      if (d.updatedPawns?.length) {
-        // Backend-authoritative kill detection (based on updated pawn state)
-        const capturedBasePawns = d.updatedPawns.filter(
-          (p: any) => String(p.currentPosition) === '0',
-        );
-
-        if (capturedBasePawns.length > 0) {
-          boardShake.value = withSequence(
-            withTiming(-6, { duration: 40 }),
-            withTiming(6, { duration: 40 }),
-            withTiming(-3, { duration: 30 }),
-            withTiming(3, { duration: 30 }),
-            withTiming(0, { duration: 20 }),
-          );
-        }
-
-        // Animate the moved pawn from oldPosition -> newPosition
-        const movedPawnDelta = d.movedPawn;
-        const updatedMovedPawn = d.updatedPawns.find(
-          (p: any) => p.id === movedPawnDelta?.pawnId,
-        );
-
-        // Track whether we should delay committing the moved pawn to avoid overwriting intermediate animation.
-        let commitDelayMs = 0;
-        let movedPawnIdForDelay: string | null = null;
-
-        // If we have move data for this pawn, animate even if it went backwards (danger-zone)
-        if (
-          movedPawnDelta?.pawnId &&
-          movedPawnDelta?.prevPosition != null &&
-          movedPawnDelta?.newPosition != null &&
-          updatedMovedPawn
-        ) {
-          const pawnBefore = pawnsRef.current.find(
-            p => p.id === movedPawnDelta.pawnId,
-          );
-
-          const fromPos = pawnBefore?.currentPosition;
-          const toPos = String(updatedMovedPawn.currentPosition ?? '');
-
-          if (fromPos && fromPos !== toPos) {
-            // Build an ordered route for this pawn color (same as UI route builder)
-            const route =
-              ROUTES_BY_COLOR[updatedMovedPawn.color] || ROUTES_BY_COLOR.red;
-
-            const fromIndex =
-              fromPos === 'finished' ? route.length : route.indexOf(fromPos);
-            const toIndex =
-              toPos === 'finished' ? route.length : route.indexOf(toPos);
-
-            if (fromIndex !== -1 && toIndex !== -1) {
-              const dir = toIndex > fromIndex ? 1 : -1;
-
-              const totalSteps = Math.abs(toIndex - fromIndex);
-
-              movedPawnIdForDelay = String(updatedMovedPawn.id);
-
-              commitDelayMs = totalSteps * 220 + 200;
-
-              // IMPORTANT
-              // use let INSIDE timeout loop
-              for (let step = 1; step <= totalSteps; step++) {
-                const targetIndex = fromIndex + dir * step;
-
-                const pos =
-                  targetIndex >= route.length ? 'finished' : route[targetIndex];
-
-                setTimeout(async () => {
-                  await Promise.resolve();
-
-                  setPawns(prev =>
-                    prev.map(p =>
-                      String(p.id) === String(updatedMovedPawn.id)
-                        ? {
-                            ...p,
-                            currentPosition: pos,
-                          }
-                        : p,
-                    ),
-                  );
-                }, step * 260);
-              }
-            }
-          }
-        }
-
-        // Commit backend state for all updated pawns.
-        // If we animated a specific pawn step-by-step, delay committing that pawn until animation ends.
-        if (movedPawnIdForDelay) {
-          setTimeout(() => {
-            setPawns(prev =>
-              prev.map(p => {
-                const updated = d.updatedPawns.find((u: any) => u.id === p.id);
-
-                if (!updated) {
-                  return p;
-                }
-
-                return {
-                  ...p,
-                  ...updated,
-                };
-              }),
-            );
-          }, commitDelayMs + 50);
-        } else {
-          setPawns(prev =>
-            prev.map(p => {
-              const updated = d.updatedPawns.find((u: any) => u.id === p.id);
-              return updated || p;
-            }),
-          );
-        }
-
-        // Also update all OTHER pawns immediately (so kills/other side effects show fast).
-        if (movedPawnIdForDelay) {
-          setPawns(prev =>
-            prev.map(p => {
-              const updated = d.updatedPawns.find((u: any) => u.id === p.id);
-              if (!updated) return p;
-              if (String(p.id) === movedPawnIdForDelay) return p; // keep animated positions until commit
-              return updated;
-            }),
-          );
-        }
-      }
-    });
-    return () => {
-      socket.removeAllListeners();
-      socket.disconnect();
-      socketRef.current = null;
-    };
-  }, [boardId, myFlmId, user?.id]);
+  initSocket();
+}, [boardId, myFlmId]);
 
   useEffect(() => {
     if (turnSecondsLeft === null || turnSecondsLeft <= 0) {
@@ -1285,15 +993,15 @@ const creatorId =
     // User sees dice value right away, not after 850ms!
     setCurrentDiceValue(rolledValue);
 
-    socketRef.current.emit(
-      'rollDice',
-      {
-        boardId,
-        playerId: myFlmId,
-        userId: user?.id,
-        diceValue: rolledValue,
-        validMoves: true,
-      },
+   socketRef.current.emit(
+  'rollDice',
+  {
+    boardId,
+    playerId: myFlmId,       // E31671 - must match socket.playerId
+    userId: user?.mrId,      // ← E94820, not user?.id (UUID)
+    diceValue: rolledValue,
+    validMoves: true,
+  },
       (response: any) => {
         setIsSelectingDice(false);
 
@@ -1584,15 +1292,15 @@ RESULT: No visible delay, smooth gameplay experience!
     await animateFrontendPawnMove(pawn, diceValue);
 
     // ===== SOCKET IN BACKGROUND =====
-    socketRef.current.emit(
-      'movePawn',
-      {
-        boardId,
-        pawnId: pawn.id,
-        playerId: myFlmId,
-        userId: user?.id,
-        diceValue,
-      },
+ socketRef.current.emit(
+  'movePawn',
+  {
+    boardId,
+    pawnId: pawn.id,
+    playerId: myFlmId,
+    userId: user?.mrId,      // ← mrId not UUID
+    diceValue,
+  },
       (response: any) => {
         setIsMovePending(false);
 
@@ -1995,14 +1703,35 @@ RESULT: No visible delay, smooth gameplay experience!
               text: 'Join',
               style: 'default',
               onPress: withClose(async () => {
-                socketRef.current?.emit(
-                  'joinGameAsActive',
-                  {
-                    boardId,
-                    playerId: myFlmId,
-                    userId: user?.id,
-                  },
+                console.log('JOIN GAME =>', {
+  role: user?.role,
+  mrId: user?.mrId,
+  flmId: user?.flmId,
+  playerIdSent: myFlmId,
+});
+console.log('=== JOIN GAME DEBUG ===');
+console.log('user object:', JSON.stringify(user, null, 2));
+console.log('boardId:', boardId);
+console.log('myFlmId:', myFlmId);
+console.log('user.id:', user?.id);
+console.log('user.mrId:', user?.mrId);
+console.log('user.flmId:', user?.flmId);
+console.log('user.role:', user?.role);
+console.log('players array:', JSON.stringify(players, null, 2));
+console.log('players playerIds:', players.map(p => ({ playerId: p.playerId, color: p.color, name: p.playerName })));
+console.log('======================');
+socketRef.current?.emit(
+  'joinGameAsActive',
+  {
+    boardId,
+    playerId: myFlmId,        // E31671 (board player id, correct)
+    userId: user?.mrId,       // ← E94820 instead of the UUID
+  },
                   async (response: any) => {
+                     console.log('=== joinGameAsActive RESPONSE ===');
+  console.log('full response:', JSON.stringify(response, null, 2));
+  console.log('================================');
+
                     if (!response?.ok) {
                       showAlert({
                         title: 'Cannot Join',
@@ -2025,11 +1754,11 @@ RESULT: No visible delay, smooth gameplay experience!
                     if (response?.data?.loggedInMrStats) {
                       setLoggedInMrStats(response.data.loggedInMrStats);
                     }
-                    socketRef.current?.emit('joinGame', {
-                      boardId,
-                      playerId: myFlmId,
-                      userId: user?.id,
-                    });
+                  socketRef.current?.emit('joinGame', {
+  boardId,
+  playerId: myFlmId,      // E31671 - this sets socket.playerId on server
+  userId: user?.mrId,     // E94820 - so backend can verify MR
+});
                   },
                 );
               }),

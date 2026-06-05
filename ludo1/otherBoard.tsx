@@ -444,95 +444,104 @@ const [rollingPlayers, setRollingPlayers] = useState<
   const displayBoardId = currentBoard?.id || null;
 
   // ─── FETCH OTHER BOARDS ───
-  const fetchOtherBoards = useCallback(async () => {
+ const fetchOtherBoards = useCallback(async () => {
+  try {
+    const baseUrl = await getBaseUrl(); // ← ADD THIS, you're using session?.backendUrl directly but other fetches use getBaseUrl()
+    const res = await fetch(`${baseUrl}/api/flm/boards/status`, {
+      method: 'POST',
+      headers: {
+        ...authHeaders(session?.token),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        creatorId: CREATOR_ID,
+        status: 'active',
+        excludePlayerId: myFlmId,
+      }),
+    });
+
+    const json = await res.json();
+    console.log('fetchOtherBoards response =>', JSON.stringify(json, null, 2)); // ← add this to debug
+
+    if (json.success) {
+   const boards = (json.data || []).filter(
+  (board: any) => {
+    // For MR: don't filter out - they can watch any board including their FLM's
+    // For FLM: exclude boards they're playing on
+    if (!isFlm) return true;
+    return !board.players?.some(
+      (p: any) => String(p.playerId) === String(myFlmId),
+    );
+  }
+);
+
+      setOtherBoards(boards);
+
+      if (boards.length > 0) {
+        setCurrentBoardIndex(0);
+        setInputBoardId(String(boards[0].id));
+      }
+    }
+  } catch (error) {
+    console.error('fetchOtherBoards error:', error);
+  }
+}, [session?.token, myFlmId]); // ← ADD myFlmId to deps
+
+  // ─── FETCH BOARD STATE ───
+ const fetchBoardState = useCallback(
+  async (bid: number) => {
     try {
-      const res = await fetch(`${baseUrl}/api/flm/boards/status`, {
+      const baseUrl = await getBaseUrl();
+      
+      const res = await fetch(`${baseUrl}/api/flm/boards/navigate`, {
         method: 'POST',
         headers: {
           ...authHeaders(session?.token),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          creatorId: CREATOR_ID,
-          status: 'active',
-          excludePlayerId: myFlmId,
+          creator: CREATOR_ID,
+          direction: 'current',
+          currentBoardId: bid,
+          excludePlayerId: null, // ← was myFlmId, that caused 404
         }),
       });
 
+      console.log('fetchBoardState status =>', res.status);
+
       if (!res.ok) {
+        const errText = await res.text();
+        console.log('fetchBoardState error body =>', errText);
         throw new Error(`HTTP error! status: ${res.status}`);
       }
 
       const json = await res.json();
+      console.log('fetchBoardState response =>', JSON.stringify(json, null, 2));
 
-      if (json.success) {
-        const boards = (json.data || []).filter(
-          (board: any) =>
-            !board.players?.some(
-              (p: any) => String(p.playerId) === String(myFlmId),
-            ),
-        );
-
-        setOtherBoards(boards);
-
-        if (boards.length > 0) {
-          setCurrentBoardIndex(0);
-          setInputBoardId(String(boards[0].id));
-        }
+      if (!json.success || !json.data) {
+        console.log('No board data found');
+        return;
       }
+
+      const data = json.data;
+      setPawns(data.pawns || []);
+      setPlayers(data.players || []);
+      setBoardData(json.data);
+      
+      const updatedDice = deriveTeamDice(data.diceValue || []);
+      setDiceRows(updatedDice);
+      
+      const myDiceRow = (data.diceValue || []).find(
+        (d: any) => d.playerId === myFlmId,
+      );
+      setMyDice(myDiceRow?.diceValue ?? null);
+      
     } catch (error) {
-      console.error('fetchOtherBoards error:', error);
+      console.error('fetchBoardState error:', error);
     }
-  }, [session?.token]);
-
-  // ─── FETCH BOARD STATE ───
-  const fetchBoardState = useCallback(
-    async (bid: number) => {
-      try {
-        const res = await fetch(`${baseUrl}/api/flm/boards/navigate`, {
-          method: 'POST',
-          headers: {
-            ...authHeaders(session?.token),
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            creator: CREATOR_ID,
-            direction: 'current',
-            currentBoardId: bid,
-            excludePlayerId: myFlmId,
-          }),
-        });
-
-        if (!res.ok) {
-          throw new Error(`HTTP error! status: ${res.status}`);
-        }
-
-        const json = await res.json();
-
-        if (!json.success || !json.data) {
-          console.log('No board data found');
-          return;
-        }
-
-        const data = json.data;
-
-        setPawns(data.pawns || []);
-        setPlayers(data.players || []);
-        setBoardData(json.data);
-        const updatedDice = deriveTeamDice(data.diceValue || []);
-
-        setDiceRows(updatedDice);
-        const myDiceRow = (data.diceValue || []).find(
-          (d: any) => d.playerId === myFlmId,
-        );
-
-        setMyDice(myDiceRow?.diceValue ?? null);
-      } catch (error) {
-        console.error('fetchBoardState error:', error);
-      }
-    },
-    [session?.token, myFlmId],
-  );
+  },
+  [session?.token, myFlmId],
+);
   const sleep = (ms: number) =>
     new Promise<void>(resolve => setTimeout(() => resolve(), ms));
 
@@ -647,15 +656,22 @@ const [rollingPlayers, setRollingPlayers] = useState<
     }
   };
   // ─── INITIALIZE ───
-  useEffect(() => {
-    fetchOtherBoards();
-  }, [fetchOtherBoards]);
+// REPLACE the two useEffects for init and fetchBoardState with this:
 
-  useEffect(() => {
-    if (!displayBoardId) return;
+useEffect(() => {
+  const init = async () => {
     setLoading(true);
-    fetchBoardState(displayBoardId).finally(() => setLoading(false));
-  }, [displayBoardId, fetchBoardState]);
+    await fetchOtherBoards();
+    setLoading(false);
+  };
+  init();
+}, [fetchOtherBoards]);
+
+useEffect(() => {
+  if (!displayBoardId) return;
+  setLoading(true);
+  fetchBoardState(displayBoardId).finally(() => setLoading(false));
+}, [displayBoardId, fetchBoardState]);
 
   // ─── SOCKET CONNECTION ───
   useEffect(() => {
@@ -1100,16 +1116,16 @@ const [rollingPlayers, setRollingPlayers] = useState<
   };
 
   // ─── LOADING STATE ───
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#8e35ff" />
-        <Text style={styles.loadingText}>Loading board...</Text>
-      </View>
-    );
-  }
+if (loading) {
+  return (
+    <View style={styles.loadingContainer}>
+      <ActivityIndicator size="large" color="#8e35ff" />
+      <Text style={styles.loadingText}>Loading board...</Text>
+    </View>
+  );
+}
 
-  if (!displayBoardId) {
+if (!displayBoardId || otherBoards.length === 0) {
     return (
       <View style={styles.loadingContainer}>
         <Icon name="sports-esports" size={s(48)} color="#8e35ff" />
